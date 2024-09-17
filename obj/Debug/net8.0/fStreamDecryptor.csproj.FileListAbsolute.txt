@@ -1,0 +1,14 @@
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.AssemblyInfoInputs.cache
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.AssemblyInfo.cs
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.csproj.CoreCompileInputs.cache
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\bin\Debug\net8.0\fStreamDecryptor.exe
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\bin\Debug\net8.0\fStreamDecryptor.deps.json
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\bin\Debug\net8.0\fStreamDecryptor.runtimeconfig.json
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\bin\Debug\net8.0\fStreamDecryptor.dll
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\bin\Debug\net8.0\fStreamDecryptor.pdb
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.dll
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\refint\fStreamDecryptor.dll
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.pdb
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.genruntimeconfig.cache
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\ref\fStreamDecryptor.dll

@@ -1,0 +1,9 @@
+cache-path;C:\Users\Windows\Documents\! Codes\osu-stream\osu!stream\obj\Debug\130\lp\48\jl\res\xml\xamarin_essentials_fileprovider_file_paths.xml
+external-cache-path;C:\Users\Windows\Documents\! Codes\osu-stream\osu!stream\obj\Debug\130\lp\48\jl\res\xml\xamarin_essentials_fileprovider_file_paths.xml
+external-path;C:\Users\Windows\Documents\! Codes\osu-stream\osu!stream\obj\Debug\130\lp\48\jl\res\xml\xamarin_essentials_fileprovider_file_paths.xml
+item;obj\Debug\130\res\values\styles.xml
+paths;C:\Users\Windows\Documents\! Codes\osu-stream\osu!stream\obj\Debug\130\lp\48\jl\res\xml\xamarin_essentials_fileprovider_file_paths.xml
+resources;obj\Debug\130\res\values\strings.xml
+resources;obj\Debug\130\res\values\styles.xml
+string;obj\Debug\130\res\values\strings.xml
+style;obj\Debug\130\res\values\styles.xml

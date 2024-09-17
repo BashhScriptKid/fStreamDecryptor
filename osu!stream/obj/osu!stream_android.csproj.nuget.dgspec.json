@@ -1,0 +1,71 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\Windows\\Documents\\! Codes\\osu-stream\\osu!stream\\osu!stream_android.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\Windows\\Documents\\! Codes\\osu-stream\\osu!stream\\osu!stream_android.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\Windows\\Documents\\! Codes\\osu-stream\\osu!stream\\osu!stream_android.csproj",
+        "projectName": "osustream",
+        "projectPath": "C:\\Users\\Windows\\Documents\\! Codes\\osu-stream\\osu!stream\\osu!stream_android.csproj",
+        "packagesPath": "C:\\Users\\Windows\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Windows\\Documents\\! Codes\\osu-stream\\osu!stream\\obj\\",
+        "projectStyle": "PackageReference",
+        "skipContentFileWrite": true,
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Windows\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "monoandroid13.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Users\\Windows\\Downloads": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "monoandroid13.0": {
+            "projectReferences": {}
+          }
+        }
+      },
+      "frameworks": {
+        "monoandroid13.0": {
+          "dependencies": {
+            "ManagedBass": {
+              "target": "Package",
+              "version": "[3.1.0, )"
+            },
+            "ManagedBass.Aac": {
+              "target": "Package",
+              "version": "[3.1.0, )"
+            },
+            "Xamarin.AndroidX.VectorDrawable": {
+              "target": "Package",
+              "version": "[1.1.0.15, )"
+            },
+            "Xamarin.Essentials": {
+              "target": "Package",
+              "version": "[1.7.3, )"
+            },
+            "Xamarin.Google.Android.Material": {
+              "target": "Package",
+              "version": "[1.7.0.1, )"
+            },
+            "Xamarin.Legacy.OpenTK": {
+              "target": "Package",
+              "version": "[1.0.2, )"
+            }
+          }
+        }
+      }
+    }
+  }
+}
