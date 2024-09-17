@@ -32,7 +32,6 @@ namespace StreamFormatDecryptor{
                 fsData.Read(hash2, 0, 16);
                 // read metadata
                 int count = br.ReadInt32();
-                
 
                 MetaRead = new Dictionary<fEnum.MapMetaType, string>();
 

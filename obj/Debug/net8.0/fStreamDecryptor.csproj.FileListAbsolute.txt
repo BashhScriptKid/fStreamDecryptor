@@ -12,3 +12,4 @@ C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\refint\fStr
 C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.pdb
 C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.genruntimeconfig.cache
 C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\ref\fStreamDecryptor.dll
+C:\Users\Windows\Documents\! Codes\fStreamDecryptor\obj\Debug\net8.0\fStreamDecryptor.sourcelink.json
