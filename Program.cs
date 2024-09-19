@@ -5,109 +5,122 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Transactions;
 
 namespace StreamFormatDecryptor
 {
 	public class Program
 	{
-		public static void ContinueOnPress(){
+		public static bool isRunning = true;
+
+		public static string filePath = String.Empty;
+
+		public static void ContinueOnPress()
+		{
 			Console.ReadLine();
+		}
+
+
+		private static (string? theIssue, bool isInvalid) CheckPathValidity(string filePath)
+		{
+			bool isInvalid = false;
+			string checkerResult = "Looks fine here but somehow we still got triggered?";
+
+			if (string.IsNullOrWhiteSpace(filePath))
+			{
+				checkerResult = "Are you even putting anything there? It's as simple as dragging it to the console.";
+				ContinueOnPress();
+				isInvalid = true;
+			}
+
+			if (!File.Exists(filePath)){
+				checkerResult = "The file does not exist. Check your file path and try again...unless it's not even a file path to begin with.";
+				ContinueOnPress();
+				isInvalid = true;
+			}
+
+			if (isInvalid)
+				return (checkerResult, isInvalid);
+				Console.Clear(); //return to the input
+
+			return (null, false);
+
+		}
+
+		public static string requestPath (){
+			Console.Write("Insert osu!stream beatmap file (osz2/osf2) to decrypt: ");
+
+			string FilePath = Convert.ToString(Console.ReadLine()?.Replace("\"", string.Empty));
+
+			(string result, bool isWrong) = CheckPathValidity(FilePath);
+			if (isWrong == true) {Console.WriteLine(result);} // We already did a null check in another function so it can be safely ignored
+
+			return FilePath;
+		}
+
+		public static bool[] CheckFileFormat(string filePath)
+		{
+			bool isInvalidFormat = false;
+			bool is_osz2 = Path.GetExtension(filePath) switch
+			{
+				".osz2" => true,
+				".osf2" => false,
+				_ => isInvalidFormat = true
+			};
+			return [isInvalidFormat, is_osz2];
 		}
 
 		public static void Main(string[] args)
 		{
-
-
-			if (Environment.IsPrivilegedProcess){
-				Console.WriteLine("This program is being run as administrator. This is not recommended under normal circumstances");
+			if (Environment.IsPrivilegedProcess)
+			{
+				Console.WriteLine("This program is being run as administrator. This is not recommended under normal circumstances.");
 				Console.WriteLine("If it needs to, under specific reasons; note that file dragging won't work. Alternatively, right click on the file while holding SHIFT and click \"Copy as Path\".");
-				Console.WriteLine();
 			}
 
+			filePath = requestPath();
 
-			Console.Write("Insert osu!stream beatmap file (osz2/osf2) to decrypt: ");
-			string? filePath = Console.ReadLine();
-			if (filePath.Contains("\""))
-				filePath = filePath.Replace("\"", ""); // It hates quotes
-			var mapFormat = fEnum.eMapFormat.undefined;
+			bool is_osz2 = CheckFileFormat(filePath)[1];
 
-			
-
-			if (!File.Exists(filePath))
+			if (CheckFileFormat(filePath)[0] == true)
 			{
-				if (filePath == null)
-					Console.WriteLine("Are you even putting anything there? It's as simple as dragging it to the console.");
-					
-				Console.WriteLine("The file does not exist. Check your file path and try again...unless it's not even a file path to begin with.");
+				Console.WriteLine("Invalid file format. Please try again.");
 				ContinueOnPress();
-				throw new IOException(filePath + " does not exist.");
-				
+				filePath = requestPath();
 			}
 
-			if (Path.GetExtension(filePath) == ".osz2")
+			Console.WriteLine($"File name: {Path.GetFileName(filePath)}");
+			Console.WriteLine($"File format: {Path.GetExtension(filePath)}");
+
+			using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+			var fileData = new byte[fileStream.Length];
+			fileStream.Read(fileData, 0, fileData.Length);
+
+			var fileMeta = new fMetadata().Fetcher(fileStream);
+
+			if (fileMeta == null)
 			{
-				mapFormat = fEnum.eMapFormat.osz2;
-			}
-			else if (Path.GetExtension(filePath) == ".osf2")
-			{
-				mapFormat = fEnum.eMapFormat.osf2;
-			}
-			else
-			{
-				Console.WriteLine("The provided file format is invalid! Check your filename before dragging (we check format by filename extension)");
+				Console.WriteLine("One or more metadatas are missing!");
 				ContinueOnPress();
-				throw new IOException("Object points to invalid file format	.");
+				return;
 			}
 
-				Console.WriteLine($"File name: {Path.GetFileName(filePath)}");
-				Console.WriteLine($"File format: {mapFormat} \n");
-				Thread.Sleep(500);
+			Console.WriteLine($"File metadata: \n Title: {fileMeta[0]} \n Artist: {fileMeta[1]} \n Mapper: {fileMeta[2]} \n Beatmap ID: {fileMeta[3]} \n");
 
-				// Allocate file to memory temporarily
-				Console.WriteLine("Loading file...");
+			var fileHash = new Hasher();
+			var key = fileHash.AESDecryptKey(fileMeta[1], fileMeta[3], fileMeta[2], fileMeta[0], is_osz2);
+			Console.WriteLine($"Hash generated: {key} \n");
 
-				
-				var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-				var fileData = new byte[fs.Length];
-				fs.Read(fileData, 0, fileData.Length);
-				Console.SetCursorPosition(0, (Console.GetCursorPosition().Top - 1));
-				Console.WriteLine($"File loaded!({fileData.Length} bytes) \n"); 
-				Thread.Sleep(500);
+			//
+			//TODO: Decryption shit here
+			//
 
-				// Display all metadata
-				fMetaDdata info = new();
-				info.Fetcher(fs);
-
-				string[] fileMeta = info.Fetcher(fs);
-
-				if (fileMeta == null){
-					Console.WriteLine("One or more metadatas are missing! \n");
-					ContinueOnPress();
-					return;
-				}
-
-				Console.WriteLine($"File metadata: \n Title: {fileMeta[0]} \n Artist: {fileMeta[1]} \n Mapper: {fileMeta[2]} \n Beatmap ID: {fileMeta[3]} \n");
-
-				Hasher fileHash = new();
-
-				string key =fileHash.AESDecryptKey(fileMeta[1], fileMeta[3], fileMeta[2], fileMeta[0], mapFormat); //todo: check if my assistant actually arranged the array correcctly
-				Console.WriteLine($"Hash generated: {key} \n");
-
-
-
-
-
-
-
-
-
-
-				//Unload at end just in case
-				fileData = null;
-				GC.Collect();
-				fs.Dispose();
-				Console.WriteLine("File unloaded.");
-				ContinueOnPress() ;
+			fileData = null;
+			fileStream.Dispose();
+			GC.Collect();
+			Console.WriteLine("File unloaded.");
+			ContinueOnPress();
+			filePath = requestPath(); //repeat process
 		}
 
 

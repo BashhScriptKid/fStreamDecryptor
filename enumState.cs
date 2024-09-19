@@ -1,10 +1,5 @@
 namespace StreamFormatDecryptor{
     public class fEnum{
-        public enum eMapFormat{
-			osz2,
-			osf2,
-			undefined
-		}
 
 		public enum fDecryptMode{
 			DIST,

@@ -21,17 +21,17 @@ namespace StreamFormatDecryptor
 	        }
 	    }
 
-	    public string AESDecryptKey(string ArtistName, string BeatmapSetID, string Mapper, string SongTitle, fEnum.eMapFormat mapFormat){
+	    public string AESDecryptKey(string ArtistName, string BeatmapSetID, string Mapper, string SongTitle, bool is_osz2){
 
 		    string KeyAlg = "";
 
-	   		switch (mapFormat)
+	   		switch (is_osz2)
 	    	{
-		    	case fEnum.eMapFormat.osz2:
+		    	case true:
 			    	KeyAlg = Mapper + "yhxyfjo5" + BeatmapSetID;
 				    break;
 
-			    case fEnum.eMapFormat.osf2:
+			    case false:
 				    KeyAlg = (char)0x08 + SongTitle + "4390gn8931i" + ArtistName;
     			    break;
     		}
