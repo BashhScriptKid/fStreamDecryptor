@@ -111,18 +111,8 @@ namespace StreamFormatDecryptor
 
 				Console.WriteLine($"File metadata: \n Title: {fileMeta[0]} \n Artist: {fileMeta[1]} \n Mapper: {fileMeta[2]} \n Beatmap ID: {fileMeta[3]} \n");
 				
-				var keySeed = "";
-				if (isOsz2)
-				{
-					keySeed = (char)0x08 + $"{fileMeta[2]}yhxyfjo5{fileMeta[3]}";	// Mapper + "yhxyfjo5" + BeatmapSetID
-				}
-				else
-				{
-					keySeed = (char)0x08 + $"{fileMeta[0]}4390gn8931i{fileMeta[1]}"; // Title + "4390gn8931i" + Artist
-				}
-				Console.WriteLine($"Using key for {Path.GetExtension(filePath)}: {keySeed}");
-				var keyOut = Hasher.CreateMD5(keySeed);
-				Console.WriteLine($"Hash generated: {keyOut} \n");
+				var keyOut = new Hasher().AESDecryptKey(fileMeta[1], fileMeta[3], fileMeta[2], fileMeta[0], isOsz2); //TODO: Fix()
+				Console.WriteLine($"Decryption key ({Path.GetExtension(filePath)}): {keyOut}");
 				var key = keyOut.ToLower().Replace("-", string.Empty);
 				
 				//TODO: Decryption shit here

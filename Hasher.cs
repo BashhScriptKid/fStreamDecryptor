@@ -28,7 +28,7 @@ namespace StreamFormatDecryptor
 	   		switch (is_osz2)
 	    	{
 		    	case true:
-			    	KeyAlg = Mapper + "yhxyfjo5" + BeatmapSetID;
+			    	KeyAlg = (char)0x08 + Mapper + "yhxyfjo5" + BeatmapSetID;
 				    break;
 
 			    case false:
