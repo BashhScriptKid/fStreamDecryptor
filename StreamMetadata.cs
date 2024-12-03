@@ -1,114 +1,151 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace StreamFormatDecryptor{
-    public class fMetadata{
+namespace StreamFormatDecryptor
+{
+    public class fMetadata
+    {
 
-        public string? ArtistName {set;get;}
-        public string? BeatmapSetID {set;get;}
-        public string? Mapper {set;get;}
-        public string? SongTitle {set;get;}
+        public string? ArtistName { set; get; }
+        public string? BeatmapSetID { set; get; }
+        public string? Mapper { set; get; }
+        public string? SongTitle { set; get; }
 
         public Dictionary<fEnum.MapMetaType, string> MetaRead;
 
         /// <summary>
-        /// Fetch metadata from a file stream from a .osz/.osk file.
+        /// Fetch metadata from a file stream from a .osz2/.osf2 file.
         ///
         /// This method reads the header of the file stream, then reads the
         /// number of metadata items, and then reads each metadata item in a for-loop iteration.
         /// </summary>
         /// <param name="stream">File stream containing the .osz/.osk file.</param>
         /// <returns>Metadata as a tuple of strings: (SongTitle, ArtistName, Mapper, BeatmapSetID)</returns>
-        public string []? Fetcher(FileStream stream)
+        public string[]? Fetcher(FileStream stream)
         {
+            if (stream == null || !stream.CanRead)
+                throw new ArgumentException("Invalid or unreadable stream provided");
 
-            /// <summary>
-            /// Binary reader to read from.
-            /// </summary>
-            using var reader = new BinaryReader(stream);
+            try
+            {
+                // Incase this mf forgot to seek to 0
+                stream.Position = 0;
+                
+                using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
 
-            ReadHeader(stream);
+                ReadHeader(stream);
 
-            // 2. Read the number of metadata items.
-            // This is a single byte containing the number of
-            // metadata items in the file.
-            var metadataCount = ReadMetadataCount(reader);
+                // Read metadata count using 7-bit encoded int for better compatibility
+                var metadataCount = Read7BitEncodedInt(reader);
+                if (metadataCount < 0 || metadataCount > 1000) // Sanity check
+                    throw new InvalidDataException($"Invalid metadata count: {metadataCount}");
 
-            // 3. Read the metadata items.
-            // This reads a number of metadata items, each of
-            // which is a short integer (the type of the metadata),
-            // followed by a string (the value of the metadata).
-            MetaRead = ReadMetadata(reader, metadataCount);
+                MetaRead = ReadMetadata(reader, metadataCount);
+                ExtractMetadataValues();
 
-            // 4. Extract the metadata values.
-            // This takes the metadata items and extracts the
-            // values for the SongTitle, ArtistName, Mapper, and
-            // BeatmapSetID fields.
-            ExtractMetadataValues();
-
-            // 5. Return the metadata values.
-            // This returns the SongTitle, ArtistName, Mapper, and
-            // BeatmapSetID fields as a tuple of strings.
-            return [SongTitle, ArtistName, Mapper, BeatmapSetID];
+                return new[] { SongTitle ?? "", ArtistName ?? "", Mapper ?? "", BeatmapSetID ?? "" };
+            }
+            catch (EndOfStreamException)
+            {
+                throw new InvalidDataException("Unexpected end of file while reading metadata");
+            }
+            catch (Exception ex) when (ex is not InvalidDataException)
+            {
+                throw new InvalidDataException($"Error reading metadata: {ex.Message}", ex);
+            }
         }
 
-        /// <summary>
-        /// Reads the header of the given stream.
-        /// </summary>
-        /// <param name="stream">The stream to read the header from.</param>
         private static void ReadHeader(FileStream stream)
         {
-            // Read header
-            var version = stream.ReadByte();
-            // Read the 16 byte header identifier
-            var headerIdentifier = new byte[16];
-            stream.Read(headerIdentifier, 0, 16);
-            // Read the first 16 byte hash
-            var hash1 = new byte[16];
-            stream.Read(hash1, 0, 16);
-            // Read the second 16 byte hash
-            var hash2 = new byte[16];
-            stream.Read(hash2, 0, 16);
-            // These hashes are used to verify the integrity of the file
-            // The first hash is the MD5 hash of the file data up to the
-            // video data offset (if the file contains video data), or
-            // up to the end of the file if there is no video data
-            // The second hash is the MD5 hash of the video data, if the
-            // file contains video data
+            const int HeaderSize = 68; // 3 (magic) + 1 (version) + 16 (iv) + 16 (hashMeta) + 16 (hashInfo) + 16 (hashBody)
+            var header = new byte[HeaderSize];
+            
+            if (stream.Length < HeaderSize)
+            {
+                throw new InvalidDataException($"File is too small to contain a valid header. File size: {stream.Length} bytes, required: {HeaderSize} bytes.");
+            }
+            
+            // Reset position
+            stream.Position = 0;
+            
+            Console.WriteLine($"Stream length: {stream.Length}");
+            Console.WriteLine($"Stream position before read: {stream.Position}");
+            
+            int bytesRead = stream.Read(header, 0, HeaderSize);
+
+            Console.WriteLine($"Bytes read: {bytesRead}");
+            Console.WriteLine($"Stream position after read: {stream.Position}");
+            
+            if (bytesRead != HeaderSize)
+                throw new InvalidDataException($"Invalid header size. Expected {HeaderSize} bytes, but read {bytesRead} bytes.");
+            
+            // Check magic number (EC 48 4F)
+            if (header[0] != 0xEC || header[1] != 0x48 || header[2] != 0x4F)
+                throw new InvalidDataException("Invalid magic number in file header");
+
+            Console.WriteLine("Valid .osz2/.osf2 header found");
+
+            var version = header[3];
+            Console.WriteLine($"Version byte: {version}");
+            if (version > 1) // Accept both version 0 and 1
+                throw new InvalidDataException($"Unsupported version: {version}");
+
+            // Extract IV and hashes
+            byte[] iv = new byte[16];
+            byte[] hashMeta = new byte[16];
+            byte[] hashInfo = new byte[16];
+            byte[] hashBody = new byte[16];
+
+            Buffer.BlockCopy(header, 4, iv, 0, 16);
+            Buffer.BlockCopy(header, 20, hashMeta, 0, 16);
+            Buffer.BlockCopy(header, 36, hashInfo, 0, 16);
+            Buffer.BlockCopy(header, 52, hashBody, 0, 16);
+
+            Console.WriteLine($"IV: {BitConverter.ToString(iv)}");
+            Console.WriteLine($"Hash Meta: {BitConverter.ToString(hashMeta)}");
+            Console.WriteLine($"Hash Info: {BitConverter.ToString(hashInfo)}");
+            Console.WriteLine($"Hash Body: {BitConverter.ToString(hashBody)}");
+
+            // Store these values if needed for decryption later
+            // this._iv = iv;
+            // this._hashMeta = hashMeta;
+            // this._hashInfo = hashInfo;
+            // this._hashBody = hashBody;
         }
 
-        private static int ReadMetadataCount(BinaryReader reader)
+        private static int Read7BitEncodedInt(BinaryReader reader)
         {
-            // Read metadata count
-            return reader.ReadInt32();
+            int count = 0;
+            int shift = 0;
+            byte b;
+            do
+            {
+                if (shift == 35)
+                    throw new InvalidDataException("Invalid 7-bit encoded int");
+                b = reader.ReadByte();
+                count |= (b & 0x7F) << shift;
+                shift += 7;
+            }
+            while ((b & 0x80) != 0);
+            return count;
         }
 
-        /// <summary>
-        /// Reads metadata from the given binary reader.
-        /// </summary>
-        /// <param name="reader">Binary reader to read from.</param>
-        /// <param name="metadataCount">Number of metadata items to read.</param>
-        /// <returns>A dictionary of metadata items, where the key is the metadata type.</returns>
         private static Dictionary<fEnum.MapMetaType, string> ReadMetadata(BinaryReader reader, int metadataCount)
         {
-            // Create an empty dictionary to store the metadata items in.
-            var metaRead = new Dictionary<fEnum.MapMetaType, string>();
+            var metaRead = new Dictionary<fEnum.MapMetaType, string>(metadataCount);
 
-            // Loop through each metadata item.
+            int count = 0;
+            
             for (var i = 0; i < metadataCount; i++)
             {
-                // Read the metadata type (a short integer) and the value (a string).
-                var key = reader.ReadInt16();
+                var key = (fEnum.MapMetaType)reader.ReadInt16();
                 var value = reader.ReadString();
 
-                // Check if the metadata type is valid.
-                if (Enum.IsDefined(typeof(fEnum.MapMetaType), key))
-                {
-                    // Add the metadata item to the dictionary.
-                    metaRead.Add((fEnum.MapMetaType)key, value);
-                }
+                metaRead[key] = value;
+                //count = Read7BitEncodedInt(reader); //this breaks the metadata fetcher?
             }
-
-            // Return the dictionary of metadata items.
+            
+            Console.WriteLine($"Found {count} metadata entries");
+            
             return metaRead;
         }
 
@@ -135,9 +172,5 @@ namespace StreamFormatDecryptor{
             else
                 return;
         }
-        
-    
-        
-
     }
 }

@@ -13,7 +13,7 @@ namespace StreamFormatDecryptor
 	{
 		public static bool isRunning = true;
 
-		public static string filePath = String.Empty;
+		public static string? filePath = String.Empty;
 
 		public static void ContinueOnPress()
 		{
@@ -21,7 +21,7 @@ namespace StreamFormatDecryptor
 		}
 
 
-		private static (string? theIssue, bool isInvalid) CheckPathValidity(string filePath)
+		private static (string? theIssue, bool isInvalid) CheckPathValidity(string? filePath)
 		{
 			bool isInvalid = false;
 			string checkerResult = "Looks fine here but somehow we still got triggered?";
@@ -47,27 +47,27 @@ namespace StreamFormatDecryptor
 
 		}
 
-		public static string requestPath (){
+		public static string? RequestPath (){
 			Console.Write("Insert osu!stream beatmap file (osz2/osf2) to decrypt: ");
 
-			string FilePath = Convert.ToString(Console.ReadLine()?.Replace("\"", string.Empty));
+			string? filePath = Convert.ToString(Console.ReadLine()?.Replace("\"", string.Empty));
 
-			(string result, bool isWrong) = CheckPathValidity(FilePath);
+			(string? result, bool isWrong) = CheckPathValidity(filePath);
 			if (isWrong == true) {Console.WriteLine(result);} // We already did a null check in another function so it can be safely ignored
-
-			return FilePath;
+			
+			return filePath;
 		}
 
-		public static bool[] CheckFileFormat(string filePath)
+		public static bool[] CheckFileFormat(string? filePath)
 		{
 			bool isInvalidFormat = false;
-			bool is_osz2 = Path.GetExtension(filePath) switch
+			bool isOsz2 = Path.GetExtension(filePath) switch
 			{
 				".osz2" => true,
 				".osf2" => false,
 				_ => isInvalidFormat = true
 			};
-			return [isInvalidFormat, is_osz2];
+			return [isInvalidFormat, isOsz2];
 		}
 
 		public static void Main(string[] args)
@@ -78,49 +78,63 @@ namespace StreamFormatDecryptor
 				Console.WriteLine("If it needs to, under specific reasons; note that file dragging won't work. Alternatively, right click on the file while holding SHIFT and click \"Copy as Path\".");
 			}
 
-			filePath = requestPath();
+			// filePath = RequestPath();
 
-			bool is_osz2 = CheckFileFormat(filePath)[1];
+			filePath = "C:\\Users\\Windows\\Documents\\! Codes\\fStreamDecryptor\\Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
+
+			bool isOsz2 = CheckFileFormat(filePath)[1];
 
 			if (CheckFileFormat(filePath)[0] == true)
 			{
 				Console.WriteLine("Invalid file format. Please try again.");
 				ContinueOnPress();
-				filePath = requestPath();
+				filePath = RequestPath();
 			}
 
 			Console.WriteLine($"File name: {Path.GetFileName(filePath)}");
 			Console.WriteLine($"File format: {Path.GetExtension(filePath)}");
 
-			using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-			var fileData = new byte[fileStream.Length];
-			fileStream.Read(fileData, 0, fileData.Length);
-
-			var fileMeta = new fMetadata().Fetcher(fileStream);
-
-			if (fileMeta == null)
+			if (filePath != null)
 			{
-				Console.WriteLine("One or more metadatas are missing!");
-				ContinueOnPress();
-				return;
+				using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+				var fileData = new byte[fileStream.Length];
+				var read = fileStream.Read(fileData, 0, fileData.Length);
+
+				var fileMeta = new fMetadata().Fetcher(fileStream);
+
+				if (fileMeta == null)
+				{
+					Console.WriteLine("One or more metadatas are missing!");
+					ContinueOnPress();
+					return;
+				}
+
+				Console.WriteLine($"File metadata: \n Title: {fileMeta[0]} \n Artist: {fileMeta[1]} \n Mapper: {fileMeta[2]} \n Beatmap ID: {fileMeta[3]} \n");
+				
+				var keySeed = "";
+				if (isOsz2)
+				{
+					keySeed = (char)0x08 + $"{fileMeta[2]}yhxyfjo5{fileMeta[3]}";	// Mapper + "yhxyfjo5" + BeatmapSetID
+				}
+				else
+				{
+					keySeed = (char)0x08 + $"{fileMeta[0]}4390gn8931i{fileMeta[1]}"; // Title + "4390gn8931i" + Artist
+				}
+				Console.WriteLine($"Using key for {Path.GetExtension(filePath)}: {keySeed}");
+				var keyOut = Hasher.CreateMD5(keySeed);
+				Console.WriteLine($"Hash generated: {keyOut} \n");
+				var key = keyOut.ToLower().Replace("-", string.Empty);
+				
+				//TODO: Decryption shit here
+				//
+
+				fileData = null;
+				fileStream.Dispose();
 			}
 
-			Console.WriteLine($"File metadata: \n Title: {fileMeta[0]} \n Artist: {fileMeta[1]} \n Mapper: {fileMeta[2]} \n Beatmap ID: {fileMeta[3]} \n");
-
-			var fileHash = new Hasher();
-			var key = fileHash.AESDecryptKey(fileMeta[1], fileMeta[3], fileMeta[2], fileMeta[0], is_osz2);
-			Console.WriteLine($"Hash generated: {key} \n");
-
-			//
-			//TODO: Decryption shit here
-			//
-
-			fileData = null;
-			fileStream.Dispose();
 			GC.Collect();
-			Console.WriteLine("File unloaded.");
-			ContinueOnPress();
-			filePath = requestPath(); //repeat process
+			Console.WriteLine("File unloaded."); ;
+			// ContinueOnPress(); filePath = RequestPath(); //repeat process
 		}
 
 

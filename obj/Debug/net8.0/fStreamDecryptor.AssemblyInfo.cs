@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("fStreamDecryptor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e6f2600902744592b9c8f0accf4b7ba6620f1903")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dce48903cdaeec487c13c4e911dc2a40be5f4cb0")]
 [assembly: System.Reflection.AssemblyProductAttribute("fStreamDecryptor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("fStreamDecryptor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

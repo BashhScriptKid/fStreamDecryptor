@@ -14,6 +14,9 @@
     <EmbeddedResource Remove="osu!stream\**" />
     <None Remove="osu!common\**" />
     <None Remove="osu!stream\**" />
+    <Compile Remove="ref\**" />
+    <EmbeddedResource Remove="ref\**" />
+    <None Remove="ref\**" />
   </ItemGroup>
 
 </Project>
