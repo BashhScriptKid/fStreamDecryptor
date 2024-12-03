@@ -115,6 +115,7 @@ namespace StreamFormatDecryptor
 				Console.WriteLine($"Decryption key ({Path.GetExtension(filePath)}): {keyOut}");
 				var key = keyOut.ToLower().Replace("-", string.Empty);
 				
+				Console.WriteLine("\n Decryption is work in progress!");
 				//TODO: Decryption shit here
 				//
 
