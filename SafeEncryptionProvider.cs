@@ -95,15 +95,15 @@ public class SafeEncryptionProvider
 
     #endregion
 
-    #region Encryption ONE
-
-    private void EncryptDecryptOneSafe(byte[] bufferArr, byte[] resultArr, int bufferLen, bool isEncrypted)
+    
+    #region Encryption ONE (Disabled)
+/**
+    private void EncryptDecryptOneSafe(byte[] bufferArr, int bufferIdx, int bufferLen, bool isEncrypted)
     {
         uint fullWordCount = unchecked((uint)bufferLen / 8);
         uint leftover = (uint)(bufferLen % 8); //remaining of fullWordCount
 
-        uint[] intWordArrB = ConvertByteArrayToUIntArray(bufferArr),
-            intWordArrO = ConvertByteArrayToUIntArray(resultArr);
+        uint[] intWordArrB = ConvertByteArrayToUIntArray(bufferArr);
 
         intWordArrB -= 2;
         intWordArrO -= 2;
@@ -130,10 +130,11 @@ public class SafeEncryptionProvider
         else
             SimpleDecryptBytesSafe(byteWordArrO2 - leftover, 0, unchecked((int)leftover));
     }
-
+**/
     #region Sub-Functions (Encrypt/Decrypt)
 
-    private void EncryptWordOne(uint[] v /*[2]*/, uint[] o /*[2]*/)
+/**
+    private void EncryptWordOne(uint[] v  uint[] o)
     {
         uint i;
         uint v0 = v[0];
@@ -151,7 +152,7 @@ public class SafeEncryptionProvider
         o[1] = v1;
     }
 
-    private void DecryptWordOne(uint[] v /*[2]*/, uint[] o /*[2]*/)
+    private void DecryptWordOne(uint[] v , uint[] o )
     {
         uint i;
         uint v0 = v[0];
@@ -168,11 +169,12 @@ public class SafeEncryptionProvider
         o[0] = v0;
         o[1] = v1;
     }
+**/
 
     #endregion
 
-    #endregion
-
+    #endregion 
+    
     #region Encryption TWO
 
     private uint _n;
@@ -318,7 +320,7 @@ public class SafeEncryptionProvider
         switch (m)
         {
             case fEnum.EncryptionMethod.One:
-                EncryptDecryptOneSafe(bufferArr, outputArr, bufferLength, encrypt);
+                throw new NotImplementedException("Holy shit it's the chosen one encryption");
                 break;
             
             case fEnum.EncryptionMethod.Two:
