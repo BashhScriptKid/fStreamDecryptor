@@ -132,8 +132,7 @@ namespace StreamFormatDecryptor
 
 		private static void DecryptFile(string filePath, fEnum.fDecryptMode mode)
 		{
-			return;
-			// todo implement decryption logic
+			
 		}
 	}
 }

@@ -18,11 +18,16 @@ namespace StreamFormatDecryptor{
 		
 		public enum EncryptionMethod
 		{
-			None,
 			One,
 			Two,
 			Three,
 			Four
+			
+		//**TRUE ENUM**//	
+			//One,
+			//Two,
+			//Homebrew,
+			//None
 		}
 		
 		
