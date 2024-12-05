@@ -54,7 +54,7 @@ namespace StreamFormatDecryptor
             }
         }
 
-        private static void ReadHeader(FileStream stream)
+        public byte[][] ReadHeader(FileStream stream)
         {
             const int HeaderSize = 68; // 3 (magic) + 1 (version) + 16 (iv) + 16 (hashMeta) + 16 (hashInfo) + 16 (hashBody)
             var header = new byte[HeaderSize];
@@ -104,6 +104,8 @@ namespace StreamFormatDecryptor
             Console.WriteLine($"Hash Meta: {BitConverter.ToString(hashMeta)}");
             Console.WriteLine($"Hash Info: {BitConverter.ToString(hashInfo)}");
             Console.WriteLine($"Hash Body: {BitConverter.ToString(hashBody)}");
+            
+            return new[] { iv, hashMeta, hashInfo, hashBody };
 
             // Store these values if needed for decryption later
             // this._iv = iv;

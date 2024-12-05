@@ -12,14 +12,14 @@ public class SafeEncryptionProvider
 
     #region Local array converter (Byte <-> Unsigned Integer)
 
-    private static byte[] ConvertUIntArrayToByteArray(uint[] input)
+    public static byte[] ConvertUIntArrayToByteArray(uint[] input)
     {
         byte[] output = new byte[input.Length * 4];
         Buffer.BlockCopy(input, 0, output, 0, output.Length);
         return output;
     }
 
-    private static uint[] ConvertByteArrayToUIntArray(byte[] input)
+    public static uint[] ConvertByteArrayToUIntArray(byte[] input)
     {
         if (input.Length % 4 != 0)
             throw new ArgumentException("Byte array length must be multiple of 4");
@@ -284,12 +284,12 @@ public class SafeEncryptionProvider
     #endregion
     
     #region Encryption HOMEBREW
-    private void EncryptDecryptHomebrew(byte[] bufferArr, int bufferLen, bool isEncrypted)
+    private void EncryptDecryptHomebrew(byte[] bufferArr, int offset,int bufferLen, bool isEncrypted)
     {
         if (isEncrypted)
-            SimpleEncryptBytesSafe(bufferArr,0, bufferLen);
+            SimpleEncryptBytesSafe(bufferArr,offset, bufferLen);
         else
-            SimpleDecryptBytesSafe(bufferArr,0, bufferLen); // Unsafe counterparts uses 0 anyways
+            SimpleDecryptBytesSafe(bufferArr,offset, bufferLen);
     }
     #endregion
 
@@ -297,22 +297,7 @@ public class SafeEncryptionProvider
     
     private void EncryptDecryptSafe(byte[] bufferArr, int bufferLen, bool isEncrypted)
     {
-        switch (m)
-        {
-            case fEnum.EncryptionMethod.One:
-                EncryptDecryptSafe(bufferArr, bufferArr, bufferLen, isEncrypted);
-                break;
-            case fEnum.EncryptionMethod.Two:
-                EncryptDecryptTwoSafe(bufferArr, isEncrypted, bufferLen, 0); // Usually unsafe function use 0 offset
-                break;
-            case fEnum.EncryptionMethod.Three:
-                EncryptDecryptHomebrew(bufferArr, bufferLen, isEncrypted);
-                break;
-            case fEnum.EncryptionMethod.Four:
-                CheckKey();
-                break;
-
-        }
+        EncryptDecryptTwoSafe(bufferArr, isEncrypted, bufferLen, 0); 
     }
 
     private void EncryptDecryptSafe(byte[] bufferArr, byte[] outputArr, int bufferLength, bool encrypt)
@@ -321,7 +306,6 @@ public class SafeEncryptionProvider
         {
             case fEnum.EncryptionMethod.One:
                 throw new NotImplementedException("Holy shit it's the chosen one encryption");
-                break;
             
             case fEnum.EncryptionMethod.Two:
                 throw new NotSupportedException(); //nuh uh
