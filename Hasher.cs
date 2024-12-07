@@ -28,10 +28,12 @@ namespace StreamFormatDecryptor
 	    	{
 		    	case true:
 			    	KeyAlg = (char)0x08 + Mapper + "yhxyfjo5" + BeatmapSetID;
+				    Console.WriteLine("Using key seed from osz2: " + KeyAlg);
 				    break;
 
 			    case false:
 				    KeyAlg = (char)0x08 + SongTitle + "4390gn8931i" + ArtistName;
+				    Console.WriteLine("Using key seed from osf2: " + KeyAlg);
     			    break;
     		}
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualBasic;
+using Microsoft.VisualBasic;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Transactions;
+// ReSharper disable InconsistentNaming
 
 namespace StreamFormatDecryptor
 {
@@ -15,8 +16,13 @@ namespace StreamFormatDecryptor
 		public static bool isRunning = true;
 
 		public static string? filePath = String.Empty;
+
+		public static byte[] keyRaw;
 		
 		private static int fOffsetData;
+		
+		public static int fOffsetFileinfo;
+		
 		
 		private static Dictionary<string, FileInfoStruct.FileInfos> fFiles;
 
@@ -105,8 +111,35 @@ namespace StreamFormatDecryptor
 				var fileData = new byte[fileStream.Length];
 				var read = fileStream.Read(fileData, 0, fileData.Length);
 
-				var fileMeta = new fMetadata().Fetcher(fileStream);
-				var fileHash = new fMetadata().ReadHeader(fileStream);
+				string[]? fileMeta = new fMetadata().Fetcher(fileStream);
+				
+					string Title = fileMeta[0];
+					string TitleUnicode = fileMeta[1];
+					string Artist = fileMeta[2];
+					string ArtistUnicode = fileMeta[3];
+					string ArtistFullName = fileMeta[4];
+					string ArtistURL = fileMeta[5];
+					string ArtistTwitter = fileMeta[6];
+					string Mapper = fileMeta[7];
+					string Version = fileMeta[8];
+					string BeatmapSetID = fileMeta[9];
+					string Source = fileMeta[10];
+					string Tags = fileMeta[11];
+					string VideoOffset = fileMeta[12];
+					string VideoLength = fileMeta[13];
+					string VideoHash = fileMeta[14];
+					string Genre = fileMeta[15];
+					string Language = fileMeta[16];
+					string UnknownMetadata = fileMeta[17];
+					string PackID = fileMeta[18];
+					string Revision = fileMeta[19];
+				
+				
+				byte[][] fileHash = new fMetadata().ReadHeader(fileStream, true);
+					byte[] fileHash_iv = fileHash[0];
+					byte[] fileHash_meta = fileHash[1];
+					byte[] fileHash_info = fileHash[2];
+					byte[] fileHash_body = fileHash[3];
 
 				if (fileMeta == null)
 				{
@@ -117,13 +150,35 @@ namespace StreamFormatDecryptor
 				
 				Console.WriteLine($"\nFile size: {fileStream.Length} bytes");
 
-				Console.WriteLine($"File metadata: \n	Title: {fileMeta[0]} \n		Artist: {fileMeta[1]} \n	Mapper: {fileMeta[2]} \n	Beatmap ID: {fileMeta[3]} \n");
-
-
-				byte[] keyRaw = new Hasher().AESDecryptKey(fileMeta[1], fileMeta[3], fileMeta[2], fileMeta[0], isOsz2);
-				string keyOut = Encoding.ASCII.GetString(keyRaw);
+				Console.WriteLine("File metadata:");
+				Console.WriteLine($"    Title: {TitleUnicode!}");
+				Console.WriteLine($"	Title (Unicode): {TitleUnicode ?? "-"}");
+				Console.WriteLine($"    Artist: {Artist ?? "-"}");
+				Console.WriteLine($"    Artist (Unicode): {ArtistUnicode ?? "-"}");
+				Console.WriteLine($"    Artist (Full Name): {ArtistFullName ?? "-"}");
+				Console.WriteLine($"    Artist URL: {ArtistURL ?? "-"}");
+				Console.WriteLine($"    Artist Twitter: {ArtistTwitter ?? "-"}");
+				Console.WriteLine($"    Mapper: {Mapper ?? "-"}");
+				Console.WriteLine($"	Version: {Version ?? "-"}");
+				Console.WriteLine($"    Beatmap ID: {BeatmapSetID ?? "-"}");
 				
-				Console.WriteLine($"Decryption key ({Path.GetExtension(filePath)}): {keyOut}");
+				// Additional metadata if available
+				Console.WriteLine($"    Source: {Source ?? "-"}");
+				Console.WriteLine($"    Tags: {Tags ?? "-"}");
+				Console.WriteLine($"    Video Data Offset: {VideoOffset ?? "-"}");
+				Console.WriteLine($"    Video Data Length: {VideoLength ?? "-"}");
+				Console.WriteLine($"    Video Hash: {VideoHash ?? "-"}");
+				Console.WriteLine($"    Genre: {Genre ?? "-"}");
+				Console.WriteLine($"    Language: {Language ?? "-"}");
+				Console.WriteLine($"	Unknown Metadata: {UnknownMetadata ?? "-"}");
+				Console.WriteLine($"	Pack ID: {PackID ?? "-"}");
+				Console.WriteLine();
+				
+				
+				keyRaw = new Hasher().AESDecryptKey(fileMeta[2], fileMeta[9], fileMeta[7], fileMeta[0], isOsz2);
+				string? keyOut = Convert.ToHexString(keyRaw);
+				
+				Console.WriteLine($"Decryption key: {keyOut}");
 				string key = keyOut.ToLower().Replace("-", string.Empty);
 				
 				DecryptFile(fileStream, fEnum.fDecryptMode.OSUM);
@@ -134,22 +189,35 @@ namespace StreamFormatDecryptor
 				string? outputFormatPrompt = Console.ReadLine();
 
 				#region Decryption
+			
+				// Set offset on FileIndo
+				fOffsetFileinfo = (int)br.BaseStream.Position;
+				
 				// Read length
-				int fileLen = br.ReadInt32();
+				Console.WriteLine(fileStream.Position);
+				int encodedLength = br.ReadInt32(); //TODO: Fix cursor position (it was way too close to end)
+				Console.WriteLine($"Encoded Length (Initial): {encodedLength}");
+				
 				for (int i = 0; i < 16; i += 2)
-					fileLen -= fileHash[2][i] | (fileHash[2][i + 1] << 17);
+				{
+					encodedLength -= fileHash_info[i] | (fileHash_info[i + 1] << 17);
+					Console.WriteLine($"Encoded Length (Iteration {i}): {encodedLength} (Reduction by ({fileHash_info[i]} OR {fileHash_info[i + 1] << 17} = {fileHash_info[i] | (fileHash_info[i + 1] << 17)})");
+				}
+
+				Console.WriteLine("Encoded Length (Final):" + encodedLength);
+				
 
 		
 		
 				// Read file to mem
-				byte[] fileInfo = br.ReadBytes(fileLen);
+				byte[] fileInfo = br.ReadBytes(encodedLength);
 				
 				// Set offset
 				int fDataOffset = (int)br.BaseStream.Position;
 				// Decode IV
 				{
 					for (int i = 0; i < fileHash[0].Length; i++) 
-						fileHash[0][i] ^= fileHash[3][i % 16];
+						fileHash_iv[i] ^= fileHash_body[i % 16];
 				}
 				using (Aes aes = new AesManaged())
 				{
@@ -169,6 +237,7 @@ namespace StreamFormatDecryptor
 						if (Comparer.Default.Compare(hash, fileHash[2]) != 0)
 							throw new IOException("File failed integrity check.");
 						
+						Console.WriteLine($"Files found ({count}):");
 						// Add file and offset to dict
 						int offset_cur = reader.ReadInt32();
 						for (int i = 0; i < count; i++)
@@ -188,6 +257,7 @@ namespace StreamFormatDecryptor
 							int fileLength = offset_next - offset_cur;
 
 							fFiles.Add(name, new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes, fileDateCreated, fileDateModified));
+							Console.WriteLine($"	{i + 1}: {fFiles.Keys}: {fFiles.Values}");
 
 							offset_cur = offset_next;
 						}
@@ -226,6 +296,8 @@ namespace StreamFormatDecryptor
 			byte[] fileBuffer = ConvertToByteArray(fileStream); 
 			
 			var algorithmProvider = new SafeEncryptionProvider();
+			
+			algorithmProvider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw), fEnum.EncryptionMethod.Two);
 			
 			// BRO HARDCODED BEATMAPS TO ENCRYPTION.TWO
 			algorithmProvider.Decrypt(fileBuffer, 0, fileBuffer.Length);

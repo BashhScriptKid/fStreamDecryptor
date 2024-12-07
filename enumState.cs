@@ -9,11 +9,29 @@ namespace StreamFormatDecryptor{
 		
 		public enum MapMetaType
 		{
-			Title = 0,
-			Artist = 1,
-			Creator = 2,
-			Version = 3,
-			BeatmapSetID = 10001 // this is the actual value for some reason (not 4)
+			Title,
+			Artist,
+			Creator,
+			Version,
+			Source,
+			Tags,
+			VideoDataOffset,
+			VideoDataLength,
+			VideoHash,
+			BeatmapSetID,
+			Genre,
+			Language,
+			TitleUnicode,
+			ArtistUnicode,
+			Unknown = 9999,
+			Difficulty,
+			PreviewTime,
+			ArtistFullName,
+			ArtistTwitter,
+			SourceUnicode,
+			ArtistUrl,
+			Revision,
+			PackId
 		}
 		
 		public enum EncryptionMethod

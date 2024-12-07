@@ -260,6 +260,11 @@ public class SafeEncryptionProvider
 
     private void DecryptWordsTwoSafe(uint[] v, int offset)
     {
+        if (v == null)
+            throw new ArgumentNullException(nameof(v));
+        if (k == null)
+            throw new InvalidOperationException("Encryption key not initialized. Call Init method first.");
+
         uint y, z, sum;
         uint p, e;
         uint rounds = 6 + 52 / _n;
