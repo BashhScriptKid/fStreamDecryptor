@@ -1,15 +1,10 @@
-using Microsoft.VisualBasic;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
-using System.Transactions;
+using StreamFormatDecryptor;
+
 // ReSharper disable InconsistentNaming
 
-namespace StreamFormatDecryptor
+namespace fStreamDecryptor
 {
 	public class Program
 	{
@@ -23,8 +18,17 @@ namespace StreamFormatDecryptor
 		
 		public static int fOffsetFileinfo;
 		
+		private static long brOffset;
+
+		static byte[] fileHash_iv;
+		static byte[] fileHash_meta;
+		static byte[] fileHash_info;
+		static byte[] fileHash_body;
+		
 		
 		private static Dictionary<string, FileInfoStruct.FileInfos> fFiles;
+
+		public static FileStream fileStream;
 
 		public static void ContinueOnPress()
 		{
@@ -104,10 +108,9 @@ namespace StreamFormatDecryptor
 
 			Console.WriteLine($"File name: {Path.GetFileName(filePath)}");
 			Console.WriteLine($"File format: {Path.GetExtension(filePath)}");
-
 			if (filePath != null)
 			{
-				using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+				fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
 				var fileData = new byte[fileStream.Length];
 				var read = fileStream.Read(fileData, 0, fileData.Length);
 
@@ -136,10 +139,10 @@ namespace StreamFormatDecryptor
 				
 				
 				byte[][] fileHash = new fMetadata().ReadHeader(fileStream, true);
-					byte[] fileHash_iv = fileHash[0];
-					byte[] fileHash_meta = fileHash[1];
-					byte[] fileHash_info = fileHash[2];
-					byte[] fileHash_body = fileHash[3];
+					fileHash_iv = fileHash[0];
+					fileHash_meta = fileHash[1];
+					fileHash_info = fileHash[2];
+					fileHash_body = fileHash[3];
 
 				if (fileMeta == null)
 				{
@@ -181,91 +184,124 @@ namespace StreamFormatDecryptor
 				Console.WriteLine($"Decryption key: {keyOut}");
 				string key = keyOut.ToLower().Replace("-", string.Empty);
 				
-				DecryptFile(fileStream, fEnum.fDecryptMode.OSUM);
-				BinaryReader br = new BinaryReader(fileStream); // Put a reader on decrypted fileStream
+				//DecryptFile(fileStream, fEnum.fDecryptMode.OSUM); // Put a reader on decrypted fileStream
 				
 				
 				Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
 				string? outputFormatPrompt = Console.ReadLine();
 
 				#region Decryption
-			
-				// Set offset on FileIndo
-				fOffsetFileinfo = (int)br.BaseStream.Position;
-				
-				// Read length
-				Console.WriteLine(fileStream.Position);
-				int encodedLength = br.ReadInt32(); //TODO: Fix cursor position (it was way too close to end)
-				Console.WriteLine($"Encoded Length (Initial): {encodedLength}");
-				
-				for (int i = 0; i < 16; i += 2)
-				{
-					encodedLength -= fileHash_info[i] | (fileHash_info[i + 1] << 17);
-					Console.WriteLine($"Encoded Length (Iteration {i}): {encodedLength} (Reduction by ({fileHash_info[i]} OR {fileHash_info[i + 1] << 17} = {fileHash_info[i] | (fileHash_info[i + 1] << 17)})");
-				}
-
-				Console.WriteLine("Encoded Length (Final):" + encodedLength);
 				
 
-		
-		
-				// Read file to mem
-				byte[] fileInfo = br.ReadBytes(encodedLength);
-				
-				// Set offset
-				int fDataOffset = (int)br.BaseStream.Position;
-				// Decode IV
-				{
-					for (int i = 0; i < fileHash[0].Length; i++) 
-						fileHash_iv[i] ^= fileHash_body[i % 16];
-				}
-				using (Aes aes = new AesManaged())
-				{
-					aes.IV = fileHash[0];
-					aes.Key = keyRaw;
-					uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+				using (BinaryReader br = new BinaryReader(fileStream))
+				{ // Reset position to after metadata
+					br.BaseStream.Position = (int)fMetadata.offsetPostMetadata;
 					
-					using (MemoryStream fileBuffer = new MemoryStream(fileHash[2]))
-					using (Stream cstream = new FastEncryptorStream(fileStream, fEnum.EncryptionMethod.Two, keyRawUInt))
-					using (BinaryReader reader = new BinaryReader(fileBuffer))
+					// exists only to keep BinaryReader position moving
 					{
-						// Read encrypted count
-						int count = reader.ReadInt32();
-						
-						//Check Hash
-						byte[] hash = GetOszHash(fileHash[2], count * 4, 0xd1);
-						if (Comparer.Default.Compare(hash, fileHash[2]) != 0)
-							throw new IOException("File failed integrity check.");
-						
-						Console.WriteLine($"Files found ({count}):");
-						// Add file and offset to dict
-						int offset_cur = reader.ReadInt32();
-						for (int i = 0; i < count; i++)
+						int countRedundant = br.ReadInt32();
+
+						for (int i = 0; i < countRedundant; i++)
 						{
-							string name = reader.ReadString();
-							byte[] fileHashes = reader.ReadBytes(16);
-							DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
-							DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
-
-							// get next offset in order to calculate length of file
-							int offset_next;
-							if (i + 1 < count)
-								offset_next = reader.ReadInt32();
-							else
-								offset_next = (int)br.BaseStream.Length - fOffsetData;
-
-							int fileLength = offset_next - offset_cur;
-
-							fFiles.Add(name, new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes, fileDateCreated, fileDateModified));
-							Console.WriteLine($"	{i + 1}: {fFiles.Keys}: {fFiles.Values}");
-
-							offset_cur = offset_next;
+							br.ReadInt16();
+							br.ReadString();
 						}
-						reader.Close();
+						int mapCount = br.ReadInt32();
+
+						for (int i = 0; i < mapCount; i++) {br.ReadString(); br.ReadInt32();}
+
+							doPostProcessing(br);
 					}
-					aes.Clear();
 				}
-				fileStream.Seek(0, SeekOrigin.Begin);
+				
+				static void doPostProcessing(BinaryReader br)
+				{
+					// Set offset on FileInfo
+					fOffsetFileinfo = (int)br.BaseStream.Position;
+
+					// Read length
+					Console.WriteLine("fileStream position:" + br.BaseStream.Position);
+					int encodedLength = br.ReadInt32(); //TODO: Fix length (too damn short)
+					Console.WriteLine($"Encoded Length (Initial): {encodedLength}");
+					
+
+					for (int i = 0; i < 16; i += 2)
+					{
+						encodedLength -= fileHash_info[i] | (fileHash_info[i + 1] << 17);
+						Console.WriteLine(
+							$"Encoded Length (Iteration {i}): {encodedLength} (Reduction by {fileHash_info[i]} OR {fileHash_info[i + 1] << 17} = {fileHash_info[i] | (fileHash_info[i + 1] << 17)})");
+					}
+
+					Console.WriteLine("Encoded Length (Final):" + encodedLength);
+
+
+
+
+					// Read file to mem
+					byte[] fileInfo = br.ReadBytes(encodedLength);
+
+					// Set offset
+					int fDataOffset = (int)br.BaseStream.Position;
+					// Decode IV
+					{
+						for (int i = 0; i < fileHash_iv.Length; i++)
+							fileHash_iv[i] ^= fileHash_body[i % 16];
+					}
+					using (Aes aes = new AesManaged())
+					{
+						aes.IV = fileHash_iv;
+						aes.Key = keyRaw;
+						uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+
+						using (MemoryStream fileBuffer = new MemoryStream(fileHash_info))
+						using (Stream cstream =
+						       new FastEncryptorStream(fileStream, fEnum.EncryptionMethod.Two, keyRawUInt))
+						using (BinaryReader reader = new BinaryReader(fileBuffer))
+						{
+							// Read encrypted count
+							int count = reader.ReadInt32();
+
+							//Check Hash
+							byte[] hash = GetOszHash(fileHash_info, count * 4, 0xd1);
+							if (Comparer.Default.Compare(hash, fileHash_info) != 0)
+								throw new IOException("File failed integrity check.");
+
+							Console.WriteLine($"Files found ({count}):");
+							// Add file and offset to dict
+							int offset_cur = reader.ReadInt32();
+							for (int i = 0; i < count; i++)
+							{
+								string name = reader.ReadString();
+								byte[] fileHashes = reader.ReadBytes(16);
+								DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
+								DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
+
+								// get next offset in order to calculate length of file
+								int offset_next;
+								if (i + 1 < count)
+									offset_next = reader.ReadInt32();
+								else
+									offset_next = (int)br.BaseStream.Length - fOffsetData;
+
+								int fileLength = offset_next - offset_cur;
+
+								fFiles.Add(name,
+									new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes,
+										fileDateCreated, fileDateModified));
+								Console.WriteLine($"	{i + 1}: {fFiles.Keys}: {fFiles.Values}");
+
+								offset_cur = offset_next;
+							}
+
+							reader.Close();
+						}
+
+						aes.Clear();
+					}
+
+					fileStream.Seek(0, SeekOrigin.Begin);
+		}
+				
 				
 				#endregion
 				

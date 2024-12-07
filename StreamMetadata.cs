@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace StreamFormatDecryptor
@@ -28,9 +29,12 @@ namespace StreamFormatDecryptor
         public string? PackId { set; get; }
         public string? Version { set; get; }
         public string? Unknown { set; get; }
+
         public string? packId { set; get; }
 
-        public Dictionary<fEnum.MapMetaType, string> MetaRead;
+        public static long offsetPostMetadata = 0;
+
+    public Dictionary<fEnum.MapMetaType, string> MetaRead;
 
         /// <summary>
         /// Fetch metadata from a file stream from a .osz2/.osf2 file.
@@ -61,6 +65,8 @@ namespace StreamFormatDecryptor
 
                 MetaRead = ReadMetadata(reader, metadataCount);
                 ExtractMetadataValues();
+                
+                offsetPostMetadata = stream.Position; // Set offset post metadata for future use
 
                 return new[] { 
                     SongTitle ?? "",
@@ -148,6 +154,8 @@ namespace StreamFormatDecryptor
             Buffer.BlockCopy(header, 36, hashInfo, 0, 16);
             Buffer.BlockCopy(header, 52, hashBody, 0, 16);
 
+            offsetPostMetadata = stream.Position; // Set offset post metadata for future use
+
             if (verbose)
             {
                 Console.WriteLine($"IV: {BitConverter.ToString(iv)}");
@@ -155,6 +163,8 @@ namespace StreamFormatDecryptor
                 Console.WriteLine($"Hash Info: {BitConverter.ToString(hashInfo)}");
                 Console.WriteLine($"Hash Body: {BitConverter.ToString(hashBody)}");
             }
+            
+            
 
             return new[] { iv, hashMeta, hashInfo, hashBody };
 
