@@ -41,7 +41,7 @@ public class SafeEncryptionProvider
 
         k = pkey;
         m = EM;
-        byte[] keyB = ConvertUIntArrayToByteArray(pkey);
+        kB = ConvertUIntArrayToByteArray(pkey);
     }
 
     private void CheckKey()
@@ -96,80 +96,87 @@ public class SafeEncryptionProvider
     #endregion
 
     
-    #region Encryption ONE (Disabled)
-/**
-    private void EncryptDecryptOneSafe(byte[] bufferArr, int bufferIdx, int bufferLen, bool isEncrypted)
+    #region Encryption ONE
+    
+    private void EncryptDecryptOneSafe(byte[] bufferArr, byte[] resultArr, int bufferLen, bool isEncrypted, 
+        int bufferPtr = 0, int resultPtr = 0) // Pointers always start at 0
     {
-        uint fullWordCount = unchecked((uint)bufferLen / 8);
-        uint leftover = (uint)(bufferLen % 8); //remaining of fullWordCount
+        uint fullWordCount = unchecked((uint)bufferLen / 8), 
+            leftover = unchecked((uint)bufferLen) % 8;
 
-        uint[] intWordArrB = ConvertByteArrayToUIntArray(bufferArr);
-
-        intWordArrB -= 2;
-        intWordArrO -= 2;
-
-        if (isEncrypted)
-            for (int wordCount = 0; wordCount < fullWordCount; wordCount++)
-                EncryptWordOne(intWordArrB += 2, intWordArrO += 2);
-        else
-            for (int wordCount = 0; wordCount < fullWordCount; wordCount++)
-                DecryptWordOne(intWordArrB += 2, intWordArrO += 2);
-
-        if (leftover == 0) return; // no leftover for me? get lost :c
-
-        byte[] bufferEnd = bufferArr + bufferLen;
-        byte[] byteWordArrB2 = bufferEnd - leftover;
-        byte[] byteWordArrO2 = ConvertUIntArrayToByteArray(resultArr + bufferLen - leftover); ;
+        uint[] intWordArrB = ConvertByteArrayToUIntArray(bufferArr), 
+            intWordArrO = ConvertByteArrayToUIntArray(resultArr);
+        int intWordPtrB = 0;
+        int intWordPtrO = 0;
         
-        // copy leftoverBuffer[] -> result[]
-        Array.Copy(byteWordArrB2, byteWordArrO2, leftover);
+        // Back up pointers by 2
+        intWordPtrB -= 2;
+        intWordPtrO -= 2;
 
-        // deal with leftover
         if (isEncrypted)
-            SimpleEncryptBytesSafe(byteWordArrO2 - leftover, 0, unchecked((int)leftover));
+        {
+            for (int wordCount = 0; wordCount < fullWordCount; wordCount++)
+                EncryptWordOneSafe(intWordArrB, intWordArrO, intWordPtrB += 2, intWordPtrO += 2);
+        }
         else
-            SimpleDecryptBytesSafe(byteWordArrO2 - leftover, 0, unchecked((int)leftover));
+        {
+            for (int wordCount = 0; wordCount < fullWordCount; wordCount++)
+                DecryptWordOneSafe(intWordArrB, intWordArrO, intWordPtrB += 2, intWordPtrO += 2);
+        }
+
+        if (leftover == 0) return; // Where's my leftover :c
+
+        byte[] bufferEnd = BitConverter.GetBytes(bufferArr[bufferPtr] + bufferLen);
+        int bufferEndPtr = 0;
+        byte[] byteWordArrB2 = BitConverter.GetBytes(bufferEnd[bufferEndPtr] - leftover);
+        int byteWordPtrB2 = 0;
+        byte[] byteWordArrO2 = BitConverter.GetBytes(resultArr[resultPtr] + bufferLen - leftover);
+        int byteWordPtrO2 = 0;
+        
+        //copy leftover buffer array to result array
+        Array.Copy(byteWordArrB2, byteWordPtrB2, byteWordArrO2, byteWordPtrO2, bufferEnd[bufferEndPtr]);
+        
+        // Deal with the leftover
+        if (isEncrypted)
+            SimpleEncryptBytesSafe(byteWordArrO2, (int)(byteWordPtrO2 - leftover), unchecked((int)leftover));
+        else
+            SimpleDecryptBytesSafe(byteWordArrO2, (int)(byteWordPtrO2 - leftover), unchecked((int)leftover));
     }
-**/
+    
     #region Sub-Functions (Encrypt/Decrypt)
 
-/**
-    private void EncryptWordOne(uint[] v  uint[] o)
+    private void EncryptWordOneSafe(uint[] v, uint[] o, int vPtr, int oPtr)
     {
         uint i;
-        uint v0 = v[0];
-        uint v1 = v[1];
+        uint v0 = v[vPtr];
+        uint v1 = v[vPtr + 1];
         uint sum = 0;
         for (i = 0; i < r; i++)
         {
-            //todo: cache sum + k for better speed
             v0 += (((v1 << 4) ^ (v1 >> 5)) + v1) ^ (sum + k[sum & 3]);
             sum += d;
             v1 += (((v0 << 4) ^ (v0 >> 5)) + v0) ^ (sum + k[(sum >> 11) & 3]);
         }
-
-        o[0] = v0;
-        o[1] = v1;
+        o[oPtr] = v0;
+        o[oPtr + 1] = v1;
     }
-
-    private void DecryptWordOne(uint[] v , uint[] o )
+    
+    private void DecryptWordOneSafe(uint[] v, uint[] o, int vPtr, int oPtr)
     {
         uint i;
-        uint v0 = v[0];
-        uint v1 = v[1];
+        uint v0 = v[vPtr];
+        uint v1 = v[vPtr + 1];
         uint sum = unchecked(d * r);
         for (i = 0; i < r; i++)
         {
-            //todo: cache sum + k for better speed
             v1 -= (((v0 << 4) ^ (v0 >> 5)) + v0) ^ (sum + k[(sum >> 11) & 3]);
             sum -= d;
             v0 -= (((v1 << 4) ^ (v1 >> 5)) + v1) ^ (sum + k[sum & 3]);
         }
 
-        o[0] = v0;
-        o[1] = v1;
+        o[oPtr] = v0;
+        o[oPtr + 1] = v1;
     }
-**/
 
     #endregion
 
@@ -226,7 +233,6 @@ public class SafeEncryptionProvider
 
         byte[] leftoverBufferProcessed = ConvertUIntArrayToByteArray(leftoverBufferWords);
         Buffer.BlockCopy(leftoverBufferProcessed, 0, bufferArr, (int)(offset + fullWordCount * NMaxBytes), (int)_n * 4);
-
 
         if (isEncrypted)
             SimpleEncryptBytesSafe(bufferArr, (int)(count - leftover) + offset, count);
@@ -299,38 +305,44 @@ public class SafeEncryptionProvider
     #endregion
 
     #region Encrypt/Decrypt Main
-    
-    private void EncryptDecryptSafe(byte[] bufferArr, int bufferLen, bool isEncrypted)
-    {
-        EncryptDecryptTwoSafe(bufferArr, isEncrypted, bufferLen, 0); 
-    }
 
-    private void EncryptDecryptSafe(byte[] bufferArr, byte[] outputArr, int bufferLength, bool encrypt)
+    private void EncryptDecryptSafe(byte[] bufferArr, int bufferLen, bool isEncrypted, 
+        int bufferPtr = 0)
     {
         switch (m)
         {
             case fEnum.EncryptionMethod.One:
-                throw new NotImplementedException("Holy shit it's the chosen one encryption");
-            
+                EncryptDecryptOneSafe(bufferArr, bufferArr, bufferLen, isEncrypted, bufferPtr, bufferPtr);
+                break;
             case fEnum.EncryptionMethod.Two:
-                throw new NotSupportedException(); //nuh uh
-            
-            case fEnum.EncryptionMethod.Three: return;
-            
+                EncryptDecryptTwoSafe(bufferArr, isEncrypted, bufferLen, bufferPtr);
+                break;
+            case fEnum.EncryptionMethod.Three:
+                EncryptDecryptHomebrew(bufferArr, bufferPtr, bufferLen, isEncrypted);
+                break;
             case fEnum.EncryptionMethod.Four:
                 CheckKey();
                 break;
         }
     }
 
-    public  void EncryptDecrypt(byte[] buffer, byte[] output, int bufStart, int outputStart, int count,
-        bool encrypt)
+    private void EncryptDecryptSafe(byte[] bufferArr, byte[] outputArr, int bufferLen, bool isEncrypted,
+        int bufferPtr = 0, int resultPtr = 0)
     {
-            //only Two is ported to managed code, so the encryption method is ignored
-            if (output != null)
-                throw new NotSupportedException("Custom output is not supported when SAFE_ENCRYPTION is enabled.");
-            EncryptDecryptTwoSafe(buffer, encrypt, count, bufStart);
+        switch (m)
+        {
+            case fEnum.EncryptionMethod.One:
+                EncryptDecryptOneSafe(bufferArr, outputArr, bufferLen, isEncrypted, bufferPtr, resultPtr);
+                break;
+            case fEnum.EncryptionMethod.Three:
+            case fEnum.EncryptionMethod.Two:
+                throw new NotSupportedException();
+            case fEnum.EncryptionMethod.Four:
+                CheckKey();
+                break;
+        }
     }
+    
 
     #endregion
     
@@ -344,22 +356,22 @@ public class SafeEncryptionProvider
     **/
     public void Decrypt(byte[] buffer)
     {
-        EncryptDecrypt(buffer, null, 0, 0, buffer.Length, false);
+        EncryptDecryptSafe(buffer, buffer.Length, false, 0);
     }
 
     public void Decrypt(byte[] buffer, int start, int count)
     {
-        EncryptDecrypt(buffer, null, start, 0, count, false);
+        EncryptDecryptSafe(buffer, count, false, start);
     }
 
     public void Decrypt(byte[] buffer, byte[] output)
     {
-        EncryptDecrypt(buffer, output, 0, 0, buffer.Length, false);
+        EncryptDecryptSafe(buffer, output, buffer.Length, false, 0, 0);
     }
 
     public void Decrypt(byte[] buffer, byte[] output, int bufStart, int outStart, int count)
     {
-        EncryptDecrypt(buffer, output, bufStart, outStart, count, false);
+        EncryptDecryptSafe(buffer, output, count, false, bufStart, outStart);
     }
     
     #endregion
@@ -372,22 +384,22 @@ public class SafeEncryptionProvider
     **/
     public void Encrypt(byte[] buffer)
     {
-        EncryptDecrypt(buffer, null, 0, 0, buffer.Length, true);
+        EncryptDecryptSafe(buffer, buffer.Length, true, 0);
     }
 
     public void Encrypt(byte[] buffer, int start, int count)
     {
-        EncryptDecrypt(buffer, null, start, 0, count, true);
+        EncryptDecryptSafe(buffer, count, true, start);
     }
 
     public void Encrypt(byte[] buffer, byte[] output)
     {
-        EncryptDecrypt(buffer, output, 0, 0, buffer.Length, true);
+        EncryptDecryptSafe(buffer, output, buffer.Length, true, 0, 0);
     }
 
     public void Encrypt(byte[] buffer, byte[] output, int bufStart, int outStart, int count)
     {
-        EncryptDecrypt(buffer, output, bufStart, outStart, count, true);
+        EncryptDecryptSafe(buffer, output, count, true, bufStart, outStart);
     }
 
 
