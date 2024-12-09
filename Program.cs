@@ -29,6 +29,8 @@ namespace fStreamDecryptor
 		private static Dictionary<string, FileInfoStruct.FileInfos> fFiles;
 
 		public static FileStream fileStream;
+		
+		private static readonly byte[] knownPlain = new byte[64];
 
 		public static void ContinueOnPress()
 		{
@@ -183,6 +185,7 @@ namespace fStreamDecryptor
 				
 				Console.WriteLine($"Decryption key: {keyOut}");
 				string key = keyOut.ToLower().Replace("-", string.Empty);
+				new FastRandom(1990).NextBytes(knownPlain);
 				
 				//DecryptFile(fileStream, fEnum.fDecryptMode.OSUM); // Put a reader on decrypted fileStream
 				
@@ -200,22 +203,32 @@ namespace fStreamDecryptor
 					// exists only to keep BinaryReader position moving
 					{
 						int countRedundant = br.ReadInt32();
+						Console.WriteLine($"Read {countRedundant} raw entries:");
 
 						for (int i = 0; i < countRedundant; i++)
 						{
-							br.ReadInt16();
-							br.ReadString();
+							Console.WriteLine($"{br.ReadInt16()}: {br.ReadString()}");
 						}
 						int mapCount = br.ReadInt32();
 
-						for (int i = 0; i < mapCount; i++) {br.ReadString(); br.ReadInt32();}
+						for (int i = 0; i < mapCount; i++)
+						{
+							Console.WriteLine($"{br.ReadString()}: {br.ReadInt32()}");
+						}
 
-							doPostProcessing(br);
+
+						doPostProcessing(br);
 					}
 				}
 				
 				static void doPostProcessing(BinaryReader br)
 				{
+					//Known plain comparison
+					FastEncryptorStream comparer = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.One, SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw));
+						byte[] plain = new byte[64]; 
+						comparer.Read(plain, 0, 64); 
+						if (!plain.SequenceEqual(knownPlain)) throw new Exception("Nope, we didn't got the key");
+						
 					// Set offset on FileInfo
 					fOffsetFileinfo = (int)br.BaseStream.Position;
 
