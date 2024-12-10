@@ -78,9 +78,9 @@ namespace StreamFormatDecryptor
 				Console.WriteLine("If it needs to, under specific reasons; note that file dragging won't work. Alternatively, right click on the file while holding SHIFT and click \"Copy as Path\".");
 			}
 
-			// filePath = RequestPath();
+			filePath = RequestPath();
 
-			filePath = "C:\\Users\\Windows\\Documents\\! Codes\\fStreamDecryptor\\Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
+//			filePath = "C:\\Users\\Windows\\Documents\\! Codes\\fStreamDecryptor\\Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
 
 			bool isOsz2 = CheckFileFormat(filePath)[1];
 
@@ -125,7 +125,7 @@ namespace StreamFormatDecryptor
 
 			GC.Collect();
 			Console.WriteLine("File unloaded."); ;
-			// ContinueOnPress(); filePath = RequestPath(); //repeat process
+			ContinueOnPress(); filePath = RequestPath(); //repeat process
 		}
 
 
