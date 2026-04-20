@@ -221,20 +221,33 @@ namespace fStreamDecryptor
 					// Read and decrypt 64 bytes of known plaintext (matches original MapPackage.cs)
 					// This advances the stream position by 64 bytes
 					Console.WriteLine($"Before 64-byte read, position: {br.BaseStream.Position}");
-					uint[] keyRawUIntForCheck = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
-					Console.WriteLine($"Key converted to uint array: {string.Join(", ", keyRawUIntForCheck)}");
+					
+					byte[] knownPlain = new byte[64];
+					new FastRandom(1990).NextBytes(knownPlain);
+					Console.WriteLine($"[DEBUG] FastRandom(1990) 64 bytes: {BitConverter.ToString(knownPlain)}");
+
 					try
 					{
-						using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.Two, keyRawUIntForCheck))
+						uint[] keyRawUIntForCheck = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+						using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.One, keyRawUIntForCheck))
 						{
 							byte[] decryptedPlain = new byte[64];
 							int bytesRead = cstream.Read(decryptedPlain, 0, 64);
 							Console.WriteLine($"Read {bytesRead} bytes of encrypted data (position now: {br.BaseStream.Position})");
+							
+							if (!decryptedPlain.SequenceEqual(knownPlain))
+							{
+								Console.WriteLine("Decrypted plain does not match known plain!");
+								Console.WriteLine($"Decrypted: {BitConverter.ToString(decryptedPlain)}");
+								Console.WriteLine($"Expected:  {BitConverter.ToString(knownPlain)}");
+								throw new Exception("Invalid key");
+							}
+							Console.WriteLine("Key verification successful (Known Plain matches).");
 						}
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"Error reading 64 bytes: {ex.Message}");
+						Console.WriteLine($"Error during key verification: {ex.Message}");
 						throw;
 					}
 

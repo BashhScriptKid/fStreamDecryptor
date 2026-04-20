@@ -335,29 +335,85 @@ public class SafeEncryptionProvider
     #endregion
 
     #region Encrypt/Decrypt Main
-    
-    private void EncryptDecryptSafe(byte[] bufferArr, int bufferLen, bool isEncrypted)
+    private void EncryptDecryptSafe(byte[] bufferArr, byte[] outputArr, int bufStart, int outputStart, int bufferLength, bool encrypt)
+{
+    switch (m)
     {
-        EncryptDecryptTwoSafe(bufferArr, isEncrypted, bufferLen, 0); 
+        case fEnum.EncryptionMethod.One:
+            EncryptDecryptOneSafe(bufferArr, outputArr, bufStart, outputStart, bufferLength, encrypt);
+            break;
+
+        case fEnum.EncryptionMethod.Two:
+            // EncryptDecryptTwoSafe handles its own word conversion and simple cipher steps
+            EncryptDecryptTwoSafe(bufferArr, !encrypt, bufferLength, bufStart); 
+            break;
+
+        case fEnum.EncryptionMethod.Three:
+            EncryptDecryptHomebrew(bufferArr, bufStart, bufferLength, encrypt);
+            break;
+
+        case fEnum.EncryptionMethod.Four:
+            //checkKey();
+            break;
+    }
+}
+private void EncryptDecryptOneSafe(byte[] bufferArr, byte[] outputArr, int bufStart, int outputStart, int bufferLength, bool encrypt)
+{
+    uint fullWordCount = unchecked((uint)bufferLength / 8);
+
+    // We need to work with a segment of the array.
+    // For simplicity, we can copy to a temporary array if not already aligned.
+    byte[] inputSegment = new byte[fullWordCount * 8];
+    Buffer.BlockCopy(bufferArr, bufStart, inputSegment, 0, inputSegment.Length);
+
+    uint[] words = ConvertByteArrayToUIntArray(inputSegment);
+    uint[] outputWords = new uint[words.Length];
+
+    if (encrypt)
+    {
+        for (int i = 0; i < fullWordCount; i++)
+            EncryptWordOneSafe(words, outputWords, i * 2);
+    }
+    else
+    {
+        for (int i = 0; i < fullWordCount; i++)
+            DecryptWordOneSafe(words, outputWords, i * 2);
     }
 
-    private void EncryptDecryptSafe(byte[] bufferArr, byte[] outputArr, int bufferLength, bool encrypt)
+    byte[] processedBytes = ConvertUIntArrayToByteArray(outputWords);
+    Buffer.BlockCopy(processedBytes, 0, outputArr ?? bufferArr, outputArr != null ? outputStart : bufStart, (int)(fullWordCount * 8));
+}
+private void EncryptWordOneSafe(uint[] v, uint[] o, int offset)
+{
+    uint i;
+    uint v0 = v[offset];
+    uint v1 = v[offset + 1];
+    uint sum = 0;
+    for (i = 0; i < r; i++)
     {
-        switch (m)
-        {
-            case fEnum.EncryptionMethod.One:
-                throw new NotImplementedException("Holy shit it's the chosen one encryption");
-            
-            case fEnum.EncryptionMethod.Two:
-                throw new NotSupportedException(); //nuh uh
-            
-            case fEnum.EncryptionMethod.Three: return;
-            
-            case fEnum.EncryptionMethod.Four:
-                CheckKey();
-                break;
-        }
+        v0 += (((v1 << 4) ^ (v1 >> 5)) + v1) ^ (sum + k[sum & 3]);
+        sum += d;
+        v1 += (((v0 << 4) ^ (v0 >> 5)) + v0) ^ (sum + k[(sum >> 11) & 3]);
     }
+    o[offset] = v0;
+    o[offset + 1] = v1;
+}
+
+private void DecryptWordOneSafe(uint[] v, uint[] o, int offset)
+{
+    uint i;
+    uint v0 = v[offset];
+    uint v1 = v[offset + 1];
+    uint sum = unchecked(d * r);
+    for (i = 0; i < r; i++)
+    {
+        v1 -= (((v0 << 4) ^ (v0 >> 5)) + v0) ^ (sum + k[(sum >> 11) & 3]);
+        sum -= d;
+        v0 -= (((v1 << 4) ^ (v1 >> 5)) + v1) ^ (sum + k[sum & 3]);
+    }
+    o[offset] = v0;
+    o[offset + 1] = v1;
+}
 
     public  void EncryptDecrypt(byte[] buffer, byte[] output, int bufStart, int outputStart, int count,
         bool encrypt)

@@ -189,17 +189,16 @@ namespace StreamFormatDecryptor
         {
             var metaRead = new Dictionary<fEnum.MapMetaType, string>(metadataCount);
 
-            int count = 0;
-            
             for (var i = 0; i < metadataCount; i++)
             {
-                var key = (fEnum.MapMetaType)reader.ReadInt16();
-                var value = reader.ReadString();
-               // count = Read7BitEncodedInt(reader); //this breaks the metadata fetcher?
+                short keyInt = reader.ReadInt16();
+                string value = reader.ReadString();
+                
+                var key = (fEnum.MapMetaType)keyInt;
+                Console.WriteLine($"[Metadata] {key} ({keyInt}): '{value}'");
 
                 metaRead[key] = value;
             }
-            //Console.WriteLine($"Found {count} metadata entries");
             
             return metaRead;
         }
