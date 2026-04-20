@@ -180,7 +180,6 @@ public class SafeEncryptionProvider
     
     #region Encryption TWO
 
-    private uint _n;
     public const uint NMax = 16;
     public const uint NMaxBytes = NMax * 4;
 
@@ -193,11 +192,10 @@ public class SafeEncryptionProvider
         Console.WriteLine("Full word count: " + fullWordCount);
         Console.WriteLine("Leftover: " + leftover);
 
-        _n = NMax;
-        uint rounds = 6 + 52 / _n;
+        uint rounds = 6 + 52 / NMax;
 
         Console.WriteLine("Rounds: " + rounds);
-        Console.WriteLine("Set max n to: " + _n);
+        Console.WriteLine("Set max n to: " + NMax);
         Console.WriteLine();
         
 
@@ -213,12 +211,12 @@ public class SafeEncryptionProvider
         if (isEncrypted)
             for (uint wordCount = 0; wordCount < fullWordCount; wordCount++)
             {
-                EncryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax));
+                EncryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax), NMax);
             }
         else //copy pasta because we dont want to waste time on a cmp each iteration
             for (uint wordCount = 0; wordCount < fullWordCount; wordCount++)
             {
-                DecryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax));
+                DecryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax), NMax);
             }
         Console.WriteLine($"{(isEncrypted ? "Decryption" : "Encryption")} done.");
         Console.WriteLine();
@@ -229,26 +227,26 @@ public class SafeEncryptionProvider
         Console.WriteLine("Copied processed buffer back to original buffer array.");
         Console.WriteLine();
         Console.WriteLine("Leftover: " + leftover);
-        _n = leftover / 4;
-        byte[] leftoverBuffer = new byte[_n * 4];
+        uint n_leftover = leftover / 4;
+        byte[] leftoverBuffer = new byte[n_leftover * 4];
         Console.WriteLine("Created leftover buffer: " + leftoverBuffer.Length + " bytes");
-        Buffer.BlockCopy(bufferArr, (int)(offset + fullWordCount * NMaxBytes), leftoverBuffer, 0, (int)_n * 4);
-        Console.WriteLine("Copied original buffer array to leftover buffer by " + (int)_n * 4 + " bytes");
+        Buffer.BlockCopy(bufferArr, (int)(offset + fullWordCount * NMaxBytes), leftoverBuffer, 0, (int)n_leftover * 4);
+        Console.WriteLine("Copied original buffer array to leftover buffer by " + (int)n_leftover * 4 + " bytes");
         uint[] leftoverBufferWords = ConvertByteArrayToUIntArray(leftoverBuffer);
         Console.WriteLine("Expanded leftover buffer to uint array.");
 
         Console.WriteLine();
         Console.WriteLine($"Starting leftover {(isEncrypted ? "decryption" : "encryption")}...");
-        if (_n > 1)
+        if (n_leftover > 1)
         {
             if (isEncrypted)
-                EncryptWordsTwoSafe(leftoverBufferWords, 0);
+                EncryptWordsTwoSafe(leftoverBufferWords, 0, n_leftover);
             else
-                DecryptWordsTwoSafe(leftoverBufferWords, 0);
+                DecryptWordsTwoSafe(leftoverBufferWords, 0, n_leftover);
 
             Console.WriteLine($"Leftover {(isEncrypted ? "decryption" : "encryption")} done.");
             
-            leftover -= _n * 4;
+            leftover -= n_leftover * 4;
 
             if (leftover == 0)
             {
@@ -260,7 +258,7 @@ public class SafeEncryptionProvider
 
         byte[] leftoverBufferProcessed = ConvertUIntArrayToByteArray(leftoverBufferWords);
         Console.WriteLine("Converted uint array back to byte array.");
-        Buffer.BlockCopy(leftoverBufferProcessed, 0, bufferArr, (int)(offset + fullWordCount * NMaxBytes), (int)_n * 4);
+        Buffer.BlockCopy(leftoverBufferProcessed, 0, bufferArr, (int)(offset + fullWordCount * NMaxBytes), (int)n_leftover * 4);
         Console.WriteLine("Copied processed leftover buffer back to original buffer array.");
 
         Console.WriteLine($"Starting final (simple) {(isEncrypted ? "decryption" : "encryption")}...");
@@ -274,29 +272,29 @@ public class SafeEncryptionProvider
 
     #region Sub-Functions (Encrypt/Decrypt)
 
-    private void EncryptWordsTwoSafe(uint[] v, int offset)
+    private void EncryptWordsTwoSafe(uint[] v, int offset, uint n)
     {
         uint y, z, sum;
         uint p, e;
-        uint rounds = 6 + 52 / _n;
+        uint rounds = 6 + 52 / n;
         sum = 0;
-        z = v[_n - 1 + offset];
+        z = v[n - 1 + offset];
         do
         {
             sum += d;
             e = (sum >> 2) & 3;
-            for (p = 0; p < _n - 1; p++)
+            for (p = 0; p < n - 1; p++)
             {
                 y = v[p + 1 + offset];
                 z = v[p + offset] += ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
             }
 
             y = v[offset];
-            z = v[_n - 1 + offset] += ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
+            z = v[n - 1 + offset] += ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
         } while (--rounds > 0);
     }
 
-    private void DecryptWordsTwoSafe(uint[] v, int offset)
+    private void DecryptWordsTwoSafe(uint[] v, int offset, uint n)
     {
         if (v == null)
             throw new ArgumentNullException(nameof(v));
@@ -305,19 +303,19 @@ public class SafeEncryptionProvider
 
         uint y, z, sum;
         uint p, e;
-        uint rounds = 6 + 52 / _n;
+        uint rounds = 6 + 52 / n;
         sum = rounds * d;
         y = v[offset];
         do
         {
             e = (sum >> 2) & 3;
-            for (p = _n - 1; p > 0; p--)
+            for (p = n - 1; p > 0; p--)
             {
                 z = v[p - 1 + offset];
                 y = v[p + offset] -= ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
             }
 
-            z = v[_n - 1 + offset];
+            z = v[n - 1 + offset];
             y = v[offset] -= ((z >> 5 ^ y << 2) + (y >> 3 ^ z << 4)) ^ ((sum ^ y) + (k[(p & 3) ^ e] ^ z));
         } while ((sum -= d) != 0);
     }

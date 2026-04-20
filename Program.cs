@@ -266,83 +266,80 @@ namespace fStreamDecryptor
 						for (int i = 0; i < fileHash_iv.Length; i++)
 							fileHash_iv[i] ^= fileHash_body[i % 16];
 					}
-					// fileInfo is the encrypted file listing; decrypt with XXTEA (FastEncryptorStream)
+					// fileInfo is the encrypted file listing; decrypt with XXTEA (SafeEncryptionProvider)
 					uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+					SafeEncryptionProvider algorithmProvider = new SafeEncryptionProvider();
+					algorithmProvider.Init(keyRawUInt, fEnum.EncryptionMethod.Two);
+					algorithmProvider.Decrypt(fileInfo);
 
 					using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
-					using (Stream cstream = new FastEncryptorStream(fileBuffer, fEnum.EncryptionMethod.Two, keyRawUInt))
-					using (BinaryReader reader = new BinaryReader(cstream))
+					using (BinaryReader reader = new BinaryReader(fileBuffer))
 						{
 							// Read encrypted count
 							int count = reader.ReadInt32();
-							Console.WriteLine($"file count (from encrypted fileInfo): {count}");
+							Console.WriteLine($"file count (from decrypted fileInfo): {count}");
 
-							//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
-							byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
-							Console.WriteLine($"computed hash: {BitConverter.ToString(hash)}");
-							Console.WriteLine($"expected hash: {BitConverter.ToString(fileHash_info)}");
-							if (!hash.SequenceEqual(fileHash_info))
-								throw new IOException("File failed integrity check.");
 
-							Console.WriteLine($"Files found ({count}):");
-							// Add file and offset to dict
-							int offset_cur = reader.ReadInt32();
-							for (int i = 0; i < count; i++)
-							{
-								string name = reader.ReadString();
-								byte[] fileHashes = reader.ReadBytes(16);
-								DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
-								DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
+						//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
+						byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
+						Console.WriteLine($"computed hash: {BitConverter.ToString(hash)}");
+						Console.WriteLine($"expected hash: {BitConverter.ToString(fileHash_info)}");
+						if (!hash.SequenceEqual(fileHash_info))
+							throw new IOException("File failed integrity check.");
 
-								// get next offset in order to calculate length of file
-								int offset_next;
-								if (i + 1 < count)
-									offset_next = reader.ReadInt32();
-								else
-									offset_next = (int)br.BaseStream.Length - fOffsetData;
+						Console.WriteLine($"Files found ({count}):");
+						// Add file and offset to dict
+						int offset_cur = reader.ReadInt32();
+						for (int i = 0; i < count; i++)
+						{
+							string name = reader.ReadString();
+							byte[] fileHashes = reader.ReadBytes(16);
+							DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
+							DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
 
-								int fileLength = offset_next - offset_cur;
+							// get next offset in order to calculate length of file
+							int offset_next;
+							if (i + 1 < count)
+								offset_next = reader.ReadInt32();
+							else
+								offset_next = (int)br.BaseStream.Length - fOffsetData;
 
-								fFiles.Add(name,
-									new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes,
-										fileDateCreated, fileDateModified));
-								Console.WriteLine($"	{i + 1}: {fFiles.Keys}: {fFiles.Values}");
+							int fileLength = offset_next - offset_cur;
 
-								offset_cur = offset_next;
-							}
+							fFiles.Add(name,
+								new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes,
+									fileDateCreated, fileDateModified));
+							Console.WriteLine($"	{i + 1}: {fFiles.Keys}: {fFiles.Values}");
 
-							reader.Close();
+							offset_cur = offset_next;
 						}
 
-						aes.Clear();
+						reader.Close();
 					}
 
-					fileStream.Seek(0, SeekOrigin.Begin);
-		}
-				
-				
-				#endregion
-				
-				switch (outputFormatPrompt?.ToLower())
-				{
-					case "folder":
-						break;
-					case "osz":
-						break;
-					default:
-						return;
-				}
+					// aes.Clear(); // aes was not defined in scope
+							}
 
 
-				fileData = null;
-				fileStream.Dispose();
-			}
+							#endregion
 
-			GC.Collect();
-			Console.WriteLine("File unloaded."); ;
-			// ContinueOnPress(); filePath = RequestPath(); //repeat process
-		}
+							switch (outputFormatPrompt?.ToLower())
+							{
+							case "folder":
+							break;
+							case "osz":
+							break;
+							default:
+							return;
+							}
 
+							fileStream.Dispose();
+							}
+
+							GC.Collect();
+							Console.WriteLine("File unloaded.");
+							// ContinueOnPress(); filePath = RequestPath(); //repeat process
+							}
 
 
 		private static byte[] DecryptFile(Stream fileStream, fEnum.fDecryptMode mode)

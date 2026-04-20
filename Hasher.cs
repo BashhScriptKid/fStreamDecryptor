@@ -10,6 +10,9 @@ namespace StreamFormatDecryptor
 {
 
     public class Hasher{
+	    public const bool UseLegacyOsz2Key = false;
+	    public const bool UseOsf2KeyForOsz2 = true;
+
       public static byte[] CreateMD5(byte[] input)
 	    {
 	    // Use input string to calculate MD5 hash
@@ -24,18 +27,16 @@ namespace StreamFormatDecryptor
 
 		    string KeyAlg = "";
 
-	   		switch (is_osz2)
+	   		if (is_osz2 && !UseOsf2KeyForOsz2)
 	    	{
-		    	case true:
-			    	KeyAlg = (char)0x08 + Mapper + "yhxyfjo5" + BeatmapSetID;
-				    Console.WriteLine("Using key seed from osz2: " + KeyAlg);
-				    break;
-
-			    case false:
-				    KeyAlg = (char)0x08 + SongTitle + "4390gn8931i" + ArtistName;
-				    Console.WriteLine("Using key seed from osf2: " + KeyAlg);
-    			    break;
+			    KeyAlg = (UseLegacyOsz2Key ? (char)0x08 : string.Empty) + Mapper + "yhxyfjo5" + BeatmapSetID;
+				Console.WriteLine("Using key seed from osz2: " + KeyAlg);
     		}
+            else
+            {
+				KeyAlg = (char)0x08 + SongTitle + "4390gn8931i" + ArtistName;
+				Console.WriteLine("Using key seed from osf2/mixed: " + KeyAlg);
+            }
 
 			byte[] Key = CreateMD5(Encoding.ASCII.GetBytes(KeyAlg))!;
 
