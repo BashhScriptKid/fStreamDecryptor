@@ -218,9 +218,29 @@ namespace fStreamDecryptor
 					// Set offset on FileInfo
 					fOffsetFileinfo = (int)br.BaseStream.Position;
 
+					// Read and decrypt 64 bytes of known plaintext (matches original MapPackage.cs)
+					// This advances the stream position by 64 bytes
+					Console.WriteLine($"Before 64-byte read, position: {br.BaseStream.Position}");
+					uint[] keyRawUIntForCheck = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+					Console.WriteLine($"Key converted to uint array: {string.Join(", ", keyRawUIntForCheck)}");
+					try
+					{
+						using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.Two, keyRawUIntForCheck))
+						{
+							byte[] decryptedPlain = new byte[64];
+							int bytesRead = cstream.Read(decryptedPlain, 0, 64);
+							Console.WriteLine($"Read {bytesRead} bytes of encrypted data (position now: {br.BaseStream.Position})");
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Error reading 64 bytes: {ex.Message}");
+						throw;
+					}
+
 					// Read length
 					Console.WriteLine("fileStream position:" + br.BaseStream.Position);
-					int encodedLength = br.ReadInt32(); //TODO: Fix length (too damn short)
+					int encodedLength = br.ReadInt32();
 					Console.WriteLine($"Encoded Length (Initial): {encodedLength}");
 					
 
