@@ -26,7 +26,7 @@ namespace fStreamDecryptor
 		static byte[] fileHash_body;
 		
 		
-		private static Dictionary<string, FileInfoStruct.FileInfos> fFiles;
+		private static Dictionary<string, FileInfoStruct.FileInfos> fFiles = new Dictionary<string, FileInfoStruct.FileInfos>(StringComparer.OrdinalIgnoreCase);
 
 		public static FileStream fileStream;
 
@@ -240,8 +240,8 @@ namespace fStreamDecryptor
 					// Read file to mem
 					byte[] fileInfo = br.ReadBytes(encodedLength);
 
-					// Set offset
-					int fDataOffset = (int)br.BaseStream.Position;
+					// Set global offset to file data (needed for last-file length calculation)
+					fOffsetData = (int)br.BaseStream.Position;
 					// Decode IV
 					{
 						for (int i = 0; i < fileHash_iv.Length; i++)
@@ -253,16 +253,17 @@ namespace fStreamDecryptor
 						aes.Key = keyRaw;
 						uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
 
-						using (MemoryStream fileBuffer = new MemoryStream(fileHash_info))
+						// fileInfo is the encrypted file listing; wrap in FastEncryptorStream to decrypt on read
+						using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
 						using (Stream cstream =
-						       new FastEncryptorStream(fileStream, fEnum.EncryptionMethod.Two, keyRawUInt))
-						using (BinaryReader reader = new BinaryReader(fileBuffer))
+						       new FastEncryptorStream(fileBuffer, fEnum.EncryptionMethod.Two, keyRawUInt))
+						using (BinaryReader reader = new BinaryReader(cstream))
 						{
 							// Read encrypted count
 							int count = reader.ReadInt32();
 
-							//Check Hash
-							byte[] hash = GetOszHash(fileHash_info, count * 4, 0xd1);
+							//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
+							byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
 							if (!hash.SequenceEqual(fileHash_info))
 								throw new IOException("File failed integrity check.");
 
