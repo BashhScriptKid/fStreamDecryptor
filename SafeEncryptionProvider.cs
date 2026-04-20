@@ -41,7 +41,7 @@ public class SafeEncryptionProvider
 
         k = pkey;
         m = EM;
-        byte[] keyB = ConvertUIntArrayToByteArray(pkey);
+        kB = ConvertUIntArrayToByteArray(pkey);
     }
 
     private void CheckKey()

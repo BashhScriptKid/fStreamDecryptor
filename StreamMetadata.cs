@@ -58,8 +58,8 @@ namespace StreamFormatDecryptor
 
                 ReadHeader(stream, false);
 
-                // Read metadata count using 7-bit encoded int for better compatibility
-                var metadataCount = Read7BitEncodedInt(reader);
+                // Read metadata count as plain Int32 (matches reference MapPackage.cs)
+                var metadataCount = reader.ReadInt32();
                 if (metadataCount < 0 || metadataCount > 1000) // Sanity check
                     throw new InvalidDataException($"Invalid metadata count: {metadataCount}");
 
@@ -153,8 +153,6 @@ namespace StreamFormatDecryptor
             Buffer.BlockCopy(header, 20, hashMeta, 0, 16);
             Buffer.BlockCopy(header, 36, hashInfo, 0, 16);
             Buffer.BlockCopy(header, 52, hashBody, 0, 16);
-
-            offsetPostMetadata = stream.Position; // Set offset post metadata for future use
 
             if (verbose)
             {

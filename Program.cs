@@ -263,7 +263,7 @@ namespace fStreamDecryptor
 
 							//Check Hash
 							byte[] hash = GetOszHash(fileHash_info, count * 4, 0xd1);
-							if (Comparer.Default.Compare(hash, fileHash_info) != 0)
+							if (!hash.SequenceEqual(fileHash_info))
 								throw new IOException("File failed integrity check.");
 
 							Console.WriteLine($"Files found ({count}):");
