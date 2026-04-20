@@ -182,35 +182,43 @@ namespace fStreamDecryptor
 				string? keyOut = Convert.ToHexString(keyRaw);
 				
 				Console.WriteLine($"Decryption key: {keyOut}");
-				string key = keyOut.ToLower().Replace("-", string.Empty);
-				
-				DecryptFile(fileStream, fEnum.fDecryptMode.OSUM); // Put a reader on decrypted fileStream
-				
+
 				string? outputFormatPrompt = null;
 				//Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
 				//outputFormatPrompt = Console.ReadLine();
 
 				#region Decryption
-				
+
+				Console.WriteLine($"\noffsetPostMetadata: {fMetadata.offsetPostMetadata}");
 
 				using (BinaryReader br = new BinaryReader(fileStream))
 				{ // Reset position to after metadata
 					br.BaseStream.Position = (int)fMetadata.offsetPostMetadata;
-					
+					Console.WriteLine($"br position after seek to offsetPostMetadata: {br.BaseStream.Position}");
+
 					// exists only to keep BinaryReader position moving
 					{
 						int countRedundant = br.ReadInt32();
+						Console.WriteLine($"countRedundant: {countRedundant}");
 
 						for (int i = 0; i < countRedundant; i++)
 						{
-							br.ReadInt16();
-							br.ReadString();
+							short redKey = br.ReadInt16();
+							string redVal = br.ReadString();
+							Console.WriteLine($"  redundant[{i}]: key={redKey} val={redVal}");
 						}
+
 						int mapCount = br.ReadInt32();
+						Console.WriteLine($"mapCount: {mapCount}");
 
 						for (int i = 0; i < mapCount; i++)
-							br.ReadString(); br.ReadInt32();
+						{
+							string mapName = br.ReadString();
+							int mapId = br.ReadInt32();
+							Console.WriteLine($"  map[{i}]: name={mapName} id={mapId}");
+						}
 
+						Console.WriteLine($"br position before doPostProcessing: {br.BaseStream.Position}");
 						doPostProcessing(br);
 					}
 				}
@@ -262,9 +270,12 @@ namespace fStreamDecryptor
 						{
 							// Read encrypted count
 							int count = reader.ReadInt32();
+							Console.WriteLine($"file count (from encrypted fileInfo): {count}");
 
 							//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
 							byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
+							Console.WriteLine($"computed hash: {BitConverter.ToString(hash)}");
+							Console.WriteLine($"expected hash: {BitConverter.ToString(fileHash_info)}");
 							if (!hash.SequenceEqual(fileHash_info))
 								throw new IOException("File failed integrity check.");
 
