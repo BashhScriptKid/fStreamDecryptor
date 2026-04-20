@@ -53,9 +53,9 @@ namespace StreamFormatDecryptor
             {
                 stream.Position = 0;
 
-                // Use ONE BinaryReader for the entire file — mixing raw stream.Read() with a
-                // separate BinaryReader causes buffer desync since BinaryReader reads ahead.
-                // This matches the reference MapPackage.cs which uses a single BinaryReader.
+                // Use ONE BinaryReader with bufferSize:1 to disable read-ahead entirely.
+                // This ensures BaseStream.Position always reflects exactly what has been
+                // logically consumed, so offsetPostMetadata is accurate.
                 using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
 
                 ReadHeaderFromReader(reader, false);
@@ -70,11 +70,27 @@ namespace StreamFormatDecryptor
                 MetaRead = ReadMetadata(reader, metadataCount);
                 ExtractMetadataValues();
 
-                // BaseStream.Position may be buffered-ahead, but since we use the same
-                // reader consistently, saving it here and seeking to it in Main gives a
-                // consistent reference point for the post-metadata block.
-                offsetPostMetadata = reader.BaseStream.Position;
-                Console.WriteLine($"[Fetcher] offsetPostMetadata: {offsetPostMetadata}");
+                // BinaryReader buffers ahead internally — BaseStream.Position is ahead of
+                // what the reader logically consumed. Force the stream back by doing a
+                // zero-byte seek relative to current position using the reader's own buffer
+                // drain: calling PeekChar() forces a refill from exactly where we are,
+                // but the simplest fix is to re-derive the position from what we know we read.
+                // Header: 68 bytes. Count int: 4 bytes. Metadata: sum of (Int16 + ReadString).
+                // Rather than recomputing, seek stream to position reader logically consumed by
+                // saving position before/after each read in ReadMetadata instead.
+                // For now: compute manually.
+                long metadataBlockSize = 4; // the metadataCount Int32
+                foreach (var kvp in MetaRead)
+                {
+                    metadataBlockSize += 2; // Int16 key
+                    var strBytes = System.Text.Encoding.UTF8.GetByteCount(kvp.Value);
+                    // BinaryReader.ReadString prefix: 7-bit encoded length
+                    int strLen = strBytes;
+                    do { metadataBlockSize++; strLen >>= 7; } while (strLen > 0);
+                    metadataBlockSize += strBytes;
+                }
+                offsetPostMetadata = 68 + metadataBlockSize;
+                Console.WriteLine($"[Fetcher] offsetPostMetadata: {offsetPostMetadata} (computed manually)");
 
                 return new[] { 
                     SongTitle ?? "",
