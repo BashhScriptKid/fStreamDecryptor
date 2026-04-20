@@ -139,6 +139,7 @@ namespace fStreamDecryptor
 					string Revision = fileMeta[19];
 				
 				
+				fileStream.Position = 0;
 				byte[][] fileHash = new fMetadata().ReadHeader(fileStream, true);
 					fileHash_iv = fileHash[0];
 					fileHash_meta = fileHash[1];
