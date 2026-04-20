@@ -53,10 +53,12 @@ namespace StreamFormatDecryptor
             {
                 // Incase this mf forgot to seek to 0
                 stream.Position = 0;
-                
-                using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
 
+                // ReadHeader reads directly from stream — construct BinaryReader after
+                // to avoid internal buffer desync between the two readers
                 ReadHeader(stream, false);
+
+                using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
 
                 // Read metadata count as plain Int32 (matches reference MapPackage.cs)
                 var metadataCount = reader.ReadInt32();
