@@ -56,7 +56,7 @@ namespace fStreamDecryptor
 
 			if (isInvalid)
 				return (checkerResult, isInvalid);
-				Console.Clear(); //return to the input
+			Console.Clear(); //return to the input
 
 			return (null, false);
 
@@ -95,7 +95,7 @@ namespace fStreamDecryptor
 
 			// filePath = RequestPath();
 
-			filePath = "C:\\Users\\Windows\\Documents\\! Codes\\fStreamDecryptor\\Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
+			filePath = "/home/bashh/Documents/! Codes/fStreamDecryptor/Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
 
 			bool isOsz2 = CheckFileFormat(filePath)[1];
 
@@ -116,7 +116,7 @@ namespace fStreamDecryptor
 
 				string[]? fileMeta = new fMetadata().Fetcher(fileStream);
 				
-					string Title = fileMeta[0];
+					string Title = fileMeta![0];
 					string TitleUnicode = fileMeta[1];
 					string Artist = fileMeta[2];
 					string ArtistUnicode = fileMeta[3];
@@ -154,15 +154,15 @@ namespace fStreamDecryptor
 				Console.WriteLine($"\nFile size: {fileStream.Length} bytes");
 
 				Console.WriteLine("File metadata:");
-				Console.WriteLine($"    Title: {TitleUnicode!}");
-				Console.WriteLine($"	Title (Unicode): {TitleUnicode ?? "-"}");
+				Console.WriteLine($"    Title: {Title ?? "-"}");
+				Console.WriteLine($"    Title (Unicode): {TitleUnicode ?? "-"}");
 				Console.WriteLine($"    Artist: {Artist ?? "-"}");
 				Console.WriteLine($"    Artist (Unicode): {ArtistUnicode ?? "-"}");
 				Console.WriteLine($"    Artist (Full Name): {ArtistFullName ?? "-"}");
 				Console.WriteLine($"    Artist URL: {ArtistURL ?? "-"}");
 				Console.WriteLine($"    Artist Twitter: {ArtistTwitter ?? "-"}");
 				Console.WriteLine($"    Mapper: {Mapper ?? "-"}");
-				Console.WriteLine($"	Version: {Version ?? "-"}");
+				Console.WriteLine($"    Version: {Version ?? "-"}");
 				Console.WriteLine($"    Beatmap ID: {BeatmapSetID ?? "-"}");
 				
 				// Additional metadata if available
@@ -173,8 +173,8 @@ namespace fStreamDecryptor
 				Console.WriteLine($"    Video Hash: {VideoHash ?? "-"}");
 				Console.WriteLine($"    Genre: {Genre ?? "-"}");
 				Console.WriteLine($"    Language: {Language ?? "-"}");
-				Console.WriteLine($"	Unknown Metadata: {UnknownMetadata ?? "-"}");
-				Console.WriteLine($"	Pack ID: {PackID ?? "-"}");
+				Console.WriteLine($"    Unknown Metadata: {UnknownMetadata ?? "-"}");
+				Console.WriteLine($"    Pack ID: {PackID ?? "-"}");
 				Console.WriteLine();
 				
 				
@@ -184,11 +184,11 @@ namespace fStreamDecryptor
 				Console.WriteLine($"Decryption key: {keyOut}");
 				string key = keyOut.ToLower().Replace("-", string.Empty);
 				
-				//DecryptFile(fileStream, fEnum.fDecryptMode.OSUM); // Put a reader on decrypted fileStream
+				DecryptFile(fileStream, fEnum.fDecryptMode.OSUM); // Put a reader on decrypted fileStream
 				
-				
-				Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
-				string? outputFormatPrompt = Console.ReadLine();
+				string? outputFormatPrompt = null;
+				//Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
+				//outputFormatPrompt = Console.ReadLine();
 
 				#region Decryption
 				
@@ -208,9 +208,10 @@ namespace fStreamDecryptor
 						}
 						int mapCount = br.ReadInt32();
 
-						for (int i = 0; i < mapCount; i++) {br.ReadString(); br.ReadInt32();}
+						for (int i = 0; i < mapCount; i++)
+							br.ReadString(); br.ReadInt32();
 
-							doPostProcessing(br);
+						doPostProcessing(br);
 					}
 				}
 				
@@ -306,7 +307,7 @@ namespace fStreamDecryptor
 				
 				#endregion
 				
-				switch (outputFormatPrompt)
+				switch (outputFormatPrompt?.ToLower())
 				{
 					case "folder":
 						break;
@@ -330,12 +331,17 @@ namespace fStreamDecryptor
 
 		private static byte[] DecryptFile(Stream fileStream, fEnum.fDecryptMode mode)
 		{
-			byte[] fileBuffer = ConvertToByteArray(fileStream); 
+			byte[] fileBuffer = ConvertToByteArray(fileStream);
+			Console.WriteLine("Converted to byte array.\n");
 			
 			var algorithmProvider = new SafeEncryptionProvider();
 			
+			Console.WriteLine("Initialising encryption provider.");
 			algorithmProvider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw), fEnum.EncryptionMethod.Two);
+			Console.WriteLine("Initialised encryption provider.\n");
 			
+			
+			Console.WriteLine("Decrypting file.");
 			// BRO HARDCODED BEATMAPS TO ENCRYPTION.TWO
 			algorithmProvider.Decrypt(fileBuffer, 0, fileBuffer.Length);
 
