@@ -16,6 +16,8 @@ namespace StreamFormatDecryptor
         private const uint Y = 842502087, Z = 3579807591;
         private uint w;
         private uint x, y, z;
+        private uint bitBuffer;
+        private int bitBufferIdx = 32;
 
         public FastRandom()
         {
@@ -33,6 +35,7 @@ namespace StreamFormatDecryptor
             y = Y;
             z = Z;
             w = W;
+            bitBufferIdx = 32;
         }
 
         public uint NextUInt()

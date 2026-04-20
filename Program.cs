@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Security.Cryptography;
+using System.Text;
 using StreamFormatDecryptor;
 
 // ReSharper disable InconsistentNaming
@@ -209,11 +210,11 @@ namespace fStreamDecryptor
 						}
 
 						Console.WriteLine($"br position before doPostProcessing: {br.BaseStream.Position}");
-						doPostProcessing(br);
+						doPostProcessing(br, fileMeta!);
 					}
 				}
 				
-				static void doPostProcessing(BinaryReader br)
+				static void doPostProcessing(BinaryReader br, string[] fileMeta)
 				{
 					// Set offset on FileInfo
 					fOffsetFileinfo = (int)br.BaseStream.Position;
@@ -228,22 +229,40 @@ namespace fStreamDecryptor
 
 					try
 					{
-						uint[] keyRawUIntForCheck = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
-						using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.One, keyRawUIntForCheck))
+						var hasher = new Hasher();
+						string[] potentialSeeds = {
+							fileMeta[7] + "yhxyfjo5" + fileMeta[9], // Mapper + yhxyfjo5 + ID
+							fileMeta[7] + "yhxyfjo5",               // Mapper + yhxyfjo5 (Empty ID)
+							fileMeta[9] + "yhxyfjo5" + fileMeta[7], // ID + yhxyfjo5 + Mapper (Reversed)
+							(char)0x08 + fileMeta[0] + "4390gn8931i" + fileMeta[2], // Title + Artist (OSF2 style)
+						};
+
+						foreach (var seed in potentialSeeds)
 						{
-							byte[] decryptedPlain = new byte[64];
-							int bytesRead = cstream.Read(decryptedPlain, 0, 64);
-							Console.WriteLine($"Read {bytesRead} bytes of encrypted data (position now: {br.BaseStream.Position})");
+							Console.WriteLine($"[TEST] Trying seed: '{seed}'");
+							byte[] key = Hasher.CreateMD5(Encoding.ASCII.GetBytes(seed));
+							uint[] keyWords = SafeEncryptionProvider.ConvertByteArrayToUIntArray(key);
 							
-							if (!decryptedPlain.SequenceEqual(knownPlain))
+							br.BaseStream.Position = fOffsetFileinfo; // Reset for each attempt
+							
+							using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.One, keyWords))
 							{
-								Console.WriteLine("Decrypted plain does not match known plain!");
-								Console.WriteLine($"Decrypted: {BitConverter.ToString(decryptedPlain)}");
-								Console.WriteLine($"Expected:  {BitConverter.ToString(knownPlain)}");
-								throw new Exception("Invalid key");
+								byte[] decryptedPlain = new byte[64];
+								cstream.Read(decryptedPlain, 0, 64);
+								
+								if (decryptedPlain.SequenceEqual(knownPlain))
+								{
+									Console.WriteLine("!!! SUCCESS !!! Key verification matched for seed: " + seed);
+									keyRaw = key; // Set global key
+									goto key_found;
+								}
 							}
-							Console.WriteLine("Key verification successful (Known Plain matches).");
 						}
+						
+						throw new Exception("Could not find a valid key seed.");
+						
+						key_found:
+						Console.WriteLine("Key verification successful.");
 					}
 					catch (Exception ex)
 					{

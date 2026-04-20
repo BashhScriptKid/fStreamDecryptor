@@ -345,9 +345,8 @@ public class SafeEncryptionProvider
 
         case fEnum.EncryptionMethod.Two:
             // EncryptDecryptTwoSafe handles its own word conversion and simple cipher steps
-            EncryptDecryptTwoSafe(bufferArr, !encrypt, bufferLength, bufStart); 
+            EncryptDecryptTwoSafe(bufferArr, encrypt, bufferLength, bufStart); 
             break;
-
         case fEnum.EncryptionMethod.Three:
             EncryptDecryptHomebrew(bufferArr, bufStart, bufferLength, encrypt);
             break;
@@ -415,15 +414,10 @@ private void DecryptWordOneSafe(uint[] v, uint[] o, int offset)
     o[offset + 1] = v1;
 }
 
-    public  void EncryptDecrypt(byte[] buffer, byte[] output, int bufStart, int outputStart, int count,
+    public void EncryptDecrypt(byte[] buffer, byte[] output, int bufStart, int outputStart, int count,
         bool encrypt)
     {
-            //only Two is ported to managed code, so the encryption method is ignored
-            if (output != null)
-                throw new NotSupportedException("Custom output is not supported when SAFE_ENCRYPTION is enabled.");
-            // encrypt=true means we want to encrypt (data is not encrypted)
-            // encrypt=false means we want to decrypt (data is encrypted)
-            EncryptDecryptTwoSafe(buffer, !encrypt, count, bufStart);
+        EncryptDecryptSafe(buffer, output, bufStart, outputStart, count, encrypt);
     }
 
     #endregion
