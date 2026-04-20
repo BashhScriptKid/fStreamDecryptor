@@ -266,17 +266,12 @@ namespace fStreamDecryptor
 						for (int i = 0; i < fileHash_iv.Length; i++)
 							fileHash_iv[i] ^= fileHash_body[i % 16];
 					}
-					using (Aes aes = new AesManaged())
-					{
-						aes.IV = fileHash_iv;
-						aes.Key = keyRaw;
-						uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
+					// fileInfo is the encrypted file listing; decrypt with XXTEA (FastEncryptorStream)
+					uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
 
-						// fileInfo is the encrypted file listing; wrap in FastEncryptorStream to decrypt on read
-						using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
-						using (Stream cstream =
-						       new FastEncryptorStream(fileBuffer, fEnum.EncryptionMethod.Two, keyRawUInt))
-						using (BinaryReader reader = new BinaryReader(cstream))
+					using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
+					using (Stream cstream = new FastEncryptorStream(fileBuffer, fEnum.EncryptionMethod.Two, keyRawUInt))
+					using (BinaryReader reader = new BinaryReader(cstream))
 						{
 							// Read encrypted count
 							int count = reader.ReadInt32();

@@ -367,7 +367,9 @@ public class SafeEncryptionProvider
             //only Two is ported to managed code, so the encryption method is ignored
             if (output != null)
                 throw new NotSupportedException("Custom output is not supported when SAFE_ENCRYPTION is enabled.");
-            EncryptDecryptTwoSafe(buffer, encrypt, count, bufStart);
+            // encrypt=true means we want to encrypt (data is not encrypted)
+            // encrypt=false means we want to decrypt (data is encrypted)
+            EncryptDecryptTwoSafe(buffer, !encrypt, count, bufStart);
     }
 
     #endregion
