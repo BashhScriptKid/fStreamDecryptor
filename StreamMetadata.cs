@@ -51,24 +51,30 @@ namespace StreamFormatDecryptor
 
             try
             {
-                // Incase this mf forgot to seek to 0
                 stream.Position = 0;
 
-                // ReadHeader reads directly from stream — construct BinaryReader after
-                // to avoid internal buffer desync between the two readers
-                ReadHeader(stream, false);
+                // Use ONE BinaryReader for the entire file — mixing raw stream.Read() with a
+                // separate BinaryReader causes buffer desync since BinaryReader reads ahead.
+                // This matches the reference MapPackage.cs which uses a single BinaryReader.
+                using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
 
-                using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
+                ReadHeaderFromReader(reader, false);
 
                 // Read metadata count as plain Int32 (matches reference MapPackage.cs)
                 var metadataCount = reader.ReadInt32();
-                if (metadataCount < 0 || metadataCount > 1000) // Sanity check
+                if (metadataCount < 0 || metadataCount > 1000)
                     throw new InvalidDataException($"Invalid metadata count: {metadataCount}");
+
+                Console.WriteLine($"[Fetcher] metadataCount: {metadataCount}");
 
                 MetaRead = ReadMetadata(reader, metadataCount);
                 ExtractMetadataValues();
-                
-                offsetPostMetadata = stream.Position; // Set offset post metadata for future use
+
+                // BaseStream.Position may be buffered-ahead, but since we use the same
+                // reader consistently, saving it here and seeking to it in Main gives a
+                // consistent reference point for the post-metadata block.
+                offsetPostMetadata = reader.BaseStream.Position;
+                Console.WriteLine($"[Fetcher] offsetPostMetadata: {offsetPostMetadata}");
 
                 return new[] { 
                     SongTitle ?? "",
@@ -105,35 +111,29 @@ namespace StreamFormatDecryptor
 
         public byte[][] ReadHeader(FileStream stream, bool verbose)
         {
-            const int HeaderSize = 68; // 3 (magic) + 1 (version) + 16 (iv) + 16 (hashMeta) + 16 (hashInfo) + 16 (hashBody)
-            var header = new byte[HeaderSize];
-            
-            if (stream.Length < HeaderSize)
-            {
-                throw new InvalidDataException($"File is too small to contain a valid header. File size: {stream.Length} bytes, required: {HeaderSize} bytes.");
-            }
-            
-            // Reset position
             stream.Position = 0;
+            using var br = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+            return ReadHeaderFromReader(br, verbose);
+        }
+
+        public byte[][] ReadHeaderFromReader(BinaryReader reader, bool verbose)
+        {
+            const int HeaderSize = 68; // 3 (magic) + 1 (version) + 16 (iv) + 16 (hashMeta) + 16 (hashInfo) + 16 (hashBody)
+
+            if (reader.BaseStream.Length < HeaderSize)
+                throw new InvalidDataException($"File is too small to contain a valid header. File size: {reader.BaseStream.Length} bytes, required: {HeaderSize} bytes.");
+
+            byte[] header = reader.ReadBytes(HeaderSize);
+
             if (verbose)
             {
-                Console.WriteLine($"Stream length: {stream.Length}");
-                Console.WriteLine($"Stream position before read: {stream.Position}");
-            }
+                Console.WriteLine($"Stream length: {reader.BaseStream.Length}");
+                Console.WriteLine($"Bytes read: {header.Length}");
+                Console.WriteLine($"Stream position after read: {reader.BaseStream.Position}");
 
-            int bytesRead = stream.Read(header, 0, HeaderSize);
+                if (header.Length != HeaderSize)
+                    throw new InvalidDataException($"Invalid header size. Expected {HeaderSize} bytes, but read {header.Length} bytes.");
 
-            if (verbose)
-            {
-                Console.WriteLine($"Bytes read: {bytesRead}");
-                Console.WriteLine($"Stream position after read: {stream.Position}");
-
-
-                if (bytesRead != HeaderSize)
-                    throw new InvalidDataException(
-                        $"Invalid header size. Expected {HeaderSize} bytes, but read {bytesRead} bytes.");
-
-                // Check magic number (EC 48 4F)
                 if (header[0] != 0xEC || header[1] != 0x48 || header[2] != 0x4F)
                     throw new InvalidDataException("Invalid magic number in file header");
 
@@ -141,17 +141,16 @@ namespace StreamFormatDecryptor
 
                 var version = header[3];
                 Console.WriteLine($"Version byte: {version}");
-                if (version > 1) // Accept both version 0 and 1
+                if (version > 1)
                     throw new InvalidDataException($"Unsupported version: {version}");
             }
 
-            // Extract IV and hashes
-            byte[] iv = new byte[16];  
+            byte[] iv = new byte[16];
             byte[] hashMeta = new byte[16];
             byte[] hashInfo = new byte[16];
             byte[] hashBody = new byte[16];
-            
-            Buffer.BlockCopy(header, 4, iv, 0, 16);
+
+            Buffer.BlockCopy(header, 4,  iv,       0, 16);
             Buffer.BlockCopy(header, 20, hashMeta, 0, 16);
             Buffer.BlockCopy(header, 36, hashInfo, 0, 16);
             Buffer.BlockCopy(header, 52, hashBody, 0, 16);
@@ -163,16 +162,8 @@ namespace StreamFormatDecryptor
                 Console.WriteLine($"Hash Info: {BitConverter.ToString(hashInfo)}");
                 Console.WriteLine($"Hash Body: {BitConverter.ToString(hashBody)}");
             }
-            
-            
 
             return new[] { iv, hashMeta, hashInfo, hashBody };
-
-            // Store these values if needed for decryption later
-            // this._iv = iv;
-            // this._hashMeta = hashMeta;
-            // this._hashInfo = hashInfo;
-            // this._hashBody = hashBody;
         }
 
         private static int Read7BitEncodedInt(BinaryReader reader)
