@@ -196,18 +196,8 @@ namespace fStreamDecryptor
 					br.BaseStream.Position = (int)fMetadata.offsetPostMetadata;
 					Console.WriteLine($"br position after seek to offsetPostMetadata: {br.BaseStream.Position}");
 
-					// exists only to keep BinaryReader position moving
+					// Read map count and map entries (matches original MapPackage.cs)
 					{
-						int countRedundant = br.ReadInt32();
-						Console.WriteLine($"countRedundant: {countRedundant}");
-
-						for (int i = 0; i < countRedundant; i++)
-						{
-							short redKey = br.ReadInt16();
-							string redVal = br.ReadString();
-							Console.WriteLine($"  redundant[{i}]: key={redKey} val={redVal}");
-						}
-
 						int mapCount = br.ReadInt32();
 						Console.WriteLine($"mapCount: {mapCount}");
 
