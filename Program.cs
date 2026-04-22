@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using StreamFormatDecryptor;
@@ -95,9 +96,7 @@ namespace fStreamDecryptor
 				Console.WriteLine("If it needs to, under specific reasons; note that file dragging won't work. Alternatively, right click on the file while holding SHIFT and click \"Copy as Path\".");
 			}
 
-			// filePath = RequestPath();
-
-			filePath = "/home/bashh/Documents/! Codes/fStreamDecryptor/Cranky - Dee Dee Cee (Deed).osz2"; // This is for debugging convenience purposes ONLY; Revert to L81 when done.
+			filePath = RequestPath();
 
 			bool isOsz2 = CheckFileFormat(filePath)[1];
 
@@ -186,9 +185,8 @@ namespace fStreamDecryptor
 				
 				Console.WriteLine($"Decryption key: {keyOut}");
 
-				string? outputFormatPrompt = null;
-				//Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
-				//outputFormatPrompt = Console.ReadLine();
+				Console.Write("\n\nDecrypted. Extract to folder or osz file? [folder/osz/none]: ");
+				string? outputFormatPrompt = Console.ReadLine();
 
 				#region Decryption
 
@@ -212,11 +210,11 @@ namespace fStreamDecryptor
 						}
 
 						Console.WriteLine($"br position before doPostProcessing: {br.BaseStream.Position}");
-						doPostProcessing(br, fileMeta!);
+						doPostProcessing(br, fileMeta!, outputFormatPrompt, filePath!);
 					}
 				}
 				
-				static void doPostProcessing(BinaryReader br, string[] fileMeta)
+				static void doPostProcessing(BinaryReader br, string[] fileMeta, string? outputFormatPrompt, string filePath)
 				{
 					int keyCheckOffset = (int)br.BaseStream.Position;
 
@@ -339,20 +337,68 @@ namespace fStreamDecryptor
 					}
 
 					// aes.Clear(); // aes was not defined in scope
+
+					string baseName = Path.GetFileNameWithoutExtension(filePath);
+					switch (outputFormatPrompt?.ToLower())
+					{
+						case "folder":
+							{
+								string outPath = Path.Combine(Path.GetDirectoryName(filePath) ?? "", baseName);
+								if (!Directory.Exists(outPath)) Directory.CreateDirectory(outPath);
+								Console.WriteLine($"Extracting to folder: {outPath}");
+
+								var provider = new SafeEncryptionProvider();
+								provider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw), fEnum.EncryptionMethod.Two);
+
+								foreach (var fi in fFiles.Values)
+								{
+									Console.Write($"  Extracting {fi.Filename}... ");
+									byte[] buffer = new byte[fi.Length];
+									br.BaseStream.Position = fOffsetData + fi.Offset;
+									br.BaseStream.Read(buffer, 0, buffer.Length);
+
+									provider.Decrypt(buffer);
+
+									File.WriteAllBytes(Path.Combine(outPath, fi.Filename), buffer);
+									Console.WriteLine("Done.");
+								}
 							}
+							break;
+						case "osz":
+							{
+								string outZip = Path.Combine(Path.GetDirectoryName(filePath) ?? "", baseName + "_decrypted.osz");
+								Console.WriteLine($"Extracting to OSZ: {outZip}");
+								if (File.Exists(outZip)) File.Delete(outZip);
+
+								using (var zipStream = new FileStream(outZip, FileMode.Create))
+								using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
+								{
+									var provider = new SafeEncryptionProvider();
+									provider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw), fEnum.EncryptionMethod.Two);
+
+									foreach (var fi in fFiles.Values)
+									{
+										Console.Write($"  Packing {fi.Filename}... ");
+										var entry = archive.CreateEntry(fi.Filename);
+										using (var entryStream = entry.Open())
+										{
+											byte[] buffer = new byte[fi.Length];
+											br.BaseStream.Position = fOffsetData + fi.Offset;
+											br.BaseStream.Read(buffer, 0, buffer.Length);
+
+											provider.Decrypt(buffer);
+											entryStream.Write(buffer, 0, buffer.Length);
+										}
+										Console.WriteLine("Done.");
+									}
+								}
+							}
+							break;
+					}
+				}
 
 
 							#endregion
-
-							switch (outputFormatPrompt?.ToLower())
-							{
-							case "folder":
-							break;
-							case "osz":
-							break;
-							default:
-							return;
-							}
 
 							fileStream.Dispose();
 							}
