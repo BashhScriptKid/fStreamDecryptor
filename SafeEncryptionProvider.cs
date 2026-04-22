@@ -4,6 +4,7 @@ namespace StreamFormatDecryptor;
 
 public class SafeEncryptionProvider
 {
+    private static readonly bool TraceAlgorithmTwo = false;
     private uint[] k;
     private byte[] kB;
     private const uint d = 0x9e3779b9;
@@ -185,32 +186,28 @@ public class SafeEncryptionProvider
     public const uint NMax = 16;
     public const uint NMaxBytes = NMax * 4;
 
-    private void EncryptDecryptTwoSafe(byte[] bufferArr, bool isEncrypted, int count, int offset)
+    private void EncryptDecryptTwoSafe(byte[] bufferArr, bool encrypt, int count, int offset)
     {
-        Console.WriteLine("\n=== CRYPTO ALGORITHM TWO ===");
         uint fullWordCount = unchecked((uint)count / NMaxBytes);
         uint leftover = unchecked((uint)count) % NMaxBytes;
-        
-        Console.WriteLine("Full word count: " + fullWordCount);
-        Console.WriteLine("Leftover: " + leftover);
 
         uint rounds = 6 + 52 / NMax;
 
-        Console.WriteLine("Rounds: " + rounds);
-        Console.WriteLine("Set max n to: " + NMax);
-        Console.WriteLine();
-        
+        if (TraceAlgorithmTwo)
+        {
+            Console.WriteLine("\n=== CRYPTO ALGORITHM TWO ===");
+            Console.WriteLine("Full word count: " + fullWordCount);
+            Console.WriteLine("Leftover: " + leftover);
+            Console.WriteLine("Rounds: " + rounds);
+            Console.WriteLine("Set max n to: " + NMax);
+            Console.WriteLine($"Starting {(encrypt ? "encryption" : "decryption")}...");
+        }
 
         byte[] bufferCut = new byte[fullWordCount * NMaxBytes];
-        Console.WriteLine("Created buffer cut: " + bufferCut.Length + " bytes");
         Buffer.BlockCopy(bufferArr, offset, bufferCut, 0, (int)(fullWordCount * NMaxBytes));
-        Console.WriteLine("Copied buffer array to buffer cut by " + (int)(fullWordCount * NMaxBytes) + " bytes");
         uint[] bufferCutWords = ConvertByteArrayToUIntArray(bufferCut);
-        Console.WriteLine("Expanded buffer cut to uint array.");
 
-        Console.WriteLine();
-        Console.WriteLine($"Starting {(isEncrypted ? "decryption" : "encryption")}...");
-        if (isEncrypted)
+        if (encrypt)
             for (uint wordCount = 0; wordCount < fullWordCount; wordCount++)
             {
                 EncryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax), NMax);
@@ -220,56 +217,57 @@ public class SafeEncryptionProvider
             {
                 DecryptWordsTwoSafe(bufferCutWords, (int)(wordCount * NMax), NMax);
             }
-        Console.WriteLine($"{(isEncrypted ? "Decryption" : "Encryption")} done.");
-        Console.WriteLine();
         
         byte[] bufferProcessed = ConvertUIntArrayToByteArray(bufferCutWords);
-        Console.WriteLine("Converted uint array back to byte array.");
         Buffer.BlockCopy(bufferProcessed, 0, bufferArr, offset, (int)(fullWordCount * NMaxBytes));
-        Console.WriteLine("Copied processed buffer back to original buffer array.");
-        Console.WriteLine();
-        Console.WriteLine("Leftover: " + leftover);
+
         uint n_leftover = leftover / 4;
         byte[] leftoverBuffer = new byte[n_leftover * 4];
-        Console.WriteLine("Created leftover buffer: " + leftoverBuffer.Length + " bytes");
         Buffer.BlockCopy(bufferArr, (int)(offset + fullWordCount * NMaxBytes), leftoverBuffer, 0, (int)n_leftover * 4);
-        Console.WriteLine("Copied original buffer array to leftover buffer by " + (int)n_leftover * 4 + " bytes");
         uint[] leftoverBufferWords = ConvertByteArrayToUIntArray(leftoverBuffer);
-        Console.WriteLine("Expanded leftover buffer to uint array.");
 
-        Console.WriteLine();
-        Console.WriteLine($"Starting leftover {(isEncrypted ? "decryption" : "encryption")}...");
         if (n_leftover > 1)
         {
-            if (isEncrypted)
+            if (TraceAlgorithmTwo)
+            {
+                Console.WriteLine($"Starting leftover {(encrypt ? "encryption" : "decryption")}...");
+            }
+
+            if (encrypt)
                 EncryptWordsTwoSafe(leftoverBufferWords, 0, n_leftover);
             else
                 DecryptWordsTwoSafe(leftoverBufferWords, 0, n_leftover);
-
-            Console.WriteLine($"Leftover {(isEncrypted ? "decryption" : "encryption")} done.");
             
             leftover -= n_leftover * 4;
 
             if (leftover == 0)
             {
-                Console.WriteLine("Leftover is 0, no need to decrypt. Returning.");
-                Console.WriteLine("============================");
+                if (TraceAlgorithmTwo)
+                {
+                    Console.WriteLine("Leftover is 0, no further byte pass required.");
+                    Console.WriteLine("============================");
+                }
                 return;
             }
         }
 
         byte[] leftoverBufferProcessed = ConvertUIntArrayToByteArray(leftoverBufferWords);
-        Console.WriteLine("Converted uint array back to byte array.");
         Buffer.BlockCopy(leftoverBufferProcessed, 0, bufferArr, (int)(offset + fullWordCount * NMaxBytes), (int)n_leftover * 4);
-        Console.WriteLine("Copied processed leftover buffer back to original buffer array.");
 
-        Console.WriteLine($"Starting final (simple) {(isEncrypted ? "decryption" : "encryption")}...");
-        if (isEncrypted)
+        if (TraceAlgorithmTwo)
+        {
+            Console.WriteLine($"Starting final (simple) {(encrypt ? "encryption" : "decryption")}...");
+        }
+
+        if (encrypt)
             SimpleEncryptBytesSafe(bufferArr, (int)(count - leftover) + offset, count);
         else
             SimpleDecryptBytesSafe(bufferArr, (int)(count - leftover) + offset, count);
-        
-        Console.WriteLine($"Final {(isEncrypted ? "decryption" : "encryption")} done.");
+
+        if (TraceAlgorithmTwo)
+        {
+            Console.WriteLine($"Final {(encrypt ? "encryption" : "decryption")} done.");
+        }
     }
 
     #region Sub-Functions (Encrypt/Decrypt)
