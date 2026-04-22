@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Collections;
 using System.Security.Cryptography;
 using System.Text;
@@ -301,48 +302,40 @@ namespace fStreamDecryptor
 						for (int i = 0; i < fileHash_iv.Length; i++)
 							fileHash_iv[i] ^= fileHash_body[i % 16];
 					}
-					// Decrypt fileInfo the same way osu!stream does: through a stream wrapper.
-					// The payload was written in many BinaryWriter calls, so whole-buffer decrypts
-					// do not match the original framing.
-					using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
-					using (Stream decryptStream = new FastEncryptorStream(fileBuffer, fEnum.EncryptionMethod.Two,
-						       SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw)))
-					using (BinaryReader reader = new BinaryReader(decryptStream))
+					FileInfoChunkReader reader = new FileInfoChunkReader(fileInfo, keyRaw);
+					int count = reader.ReadInt32();
+					Console.WriteLine($"file count (from decrypted fileInfo): {count}");
+
+					//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
+					byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
+					Console.WriteLine($"computed hash: {BitConverter.ToString(hash)}");
+					Console.WriteLine($"expected hash: {BitConverter.ToString(fileHash_info)}");
+					if (!hash.SequenceEqual(fileHash_info))
+						throw new IOException("File failed integrity check.");
+
+					Console.WriteLine($"Files found ({count}):");
+					int offset_cur = reader.ReadInt32();
+					for (int i = 0; i < count; i++)
 					{
-						int count = reader.ReadInt32();
-						Console.WriteLine($"file count (from decrypted fileInfo): {count}");
+						string name = reader.ReadLegacyString();
+						byte[] fileHashes = reader.ReadBytes(16);
+						DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
+						DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
 
-						//Check Hash: compute over content (fileInfo), compare against header hash (fileHash_info)
-						byte[] hash = GetOszHash(fileInfo, count * 4, 0xd1);
-						Console.WriteLine($"computed hash: {BitConverter.ToString(hash)}");
-						Console.WriteLine($"expected hash: {BitConverter.ToString(fileHash_info)}");
-						if (!hash.SequenceEqual(fileHash_info))
-							throw new IOException("File failed integrity check.");
+						int offset_next;
+						if (i + 1 < count)
+							offset_next = reader.ReadInt32();
+						else
+							offset_next = (int)br.BaseStream.Length - fOffsetData;
 
-						Console.WriteLine($"Files found ({count}):");
-						int offset_cur = reader.ReadInt32();
-						for (int i = 0; i < count; i++)
-						{
-							string name = reader.ReadString();
-							byte[] fileHashes = reader.ReadBytes(16);
-							DateTime fileDateCreated = DateTime.FromBinary(reader.ReadInt64());
-							DateTime fileDateModified = DateTime.FromBinary(reader.ReadInt64());
+						int fileLength = offset_next - offset_cur;
 
-							int offset_next;
-							if (i + 1 < count)
-								offset_next = reader.ReadInt32();
-							else
-								offset_next = (int)br.BaseStream.Length - fOffsetData;
+						fFiles.Add(name,
+							new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes,
+								fileDateCreated, fileDateModified));
+						Console.WriteLine($"    {i + 1}: {name} | offset={offset_cur} | length={fileLength}");
 
-							int fileLength = offset_next - offset_cur;
-
-							fFiles.Add(name,
-								new FileInfoStruct.FileInfos(name, offset_cur, fileLength, fileHashes,
-									fileDateCreated, fileDateModified));
-							Console.WriteLine($"    {i + 1}: {name} | offset={offset_cur} | length={fileLength}");
-
-							offset_cur = offset_next;
-						}
+						offset_cur = offset_next;
 					}
 
 					// aes.Clear(); // aes was not defined in scope
@@ -400,6 +393,75 @@ namespace fStreamDecryptor
 			}
 		}
 		#endregion
+
+		private sealed class FileInfoChunkReader
+		{
+			private readonly byte[] source;
+			private readonly SafeEncryptionProvider provider = new SafeEncryptionProvider();
+			private int position;
+
+			public FileInfoChunkReader(byte[] source, byte[] key)
+			{
+				this.source = source;
+				provider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(key), fEnum.EncryptionMethod.Two);
+			}
+
+			public int ReadInt32()
+			{
+				return BinaryPrimitives.ReadInt32LittleEndian(ReadDecryptedChunk(sizeof(int)));
+			}
+
+			public long ReadInt64()
+			{
+				return BinaryPrimitives.ReadInt64LittleEndian(ReadDecryptedChunk(sizeof(long)));
+			}
+
+			public byte[] ReadBytes(int count)
+			{
+				return ReadDecryptedChunk(count);
+			}
+
+			public string ReadLegacyString()
+			{
+				int byteCount = ReadLegacy7BitEncodedInt();
+				if (byteCount == 0)
+					return string.Empty;
+
+				return Encoding.UTF8.GetString(ReadDecryptedChunk(byteCount));
+			}
+
+			private int ReadLegacy7BitEncodedInt()
+			{
+				int count = 0;
+				int shift = 0;
+
+				while (true)
+				{
+					if (shift == 35)
+						throw new InvalidDataException("Invalid 7-bit encoded int in file info.");
+
+					byte value = ReadDecryptedChunk(1)[0];
+					count |= (value & 0x7F) << shift;
+
+					if ((value & 0x80) == 0)
+						return count;
+
+					shift += 7;
+				}
+			}
+
+			private byte[] ReadDecryptedChunk(int count)
+			{
+				if (position + count > source.Length)
+					throw new EndOfStreamException("Unexpected end of encrypted file info.");
+
+				byte[] chunk = new byte[count];
+				Buffer.BlockCopy(source, position, chunk, 0, count);
+				provider.Decrypt(chunk, 0, count);
+				position += count;
+				return chunk;
+			}
+		}
 
 		#region OSZ Hash check
 		private static byte[] GetOszHash(byte[] buffer, int pos, byte swap)

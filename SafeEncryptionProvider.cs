@@ -56,30 +56,30 @@ public class SafeEncryptionProvider
 
     #region Simple Bytes Encrypt/Decrypt
 
-    private void SimpleEncryptBytesSafe(byte[] buf, int offset, int count)
+    private void SimpleEncryptBytesSafe(byte[] buf, int offset, int length)
     {
         byte prevE = 0; // previous encrypted
-        for (int i = offset; i < count; i++)
+        for (int i = 0; i < length; i++)
         {
-            int localIndex = i - offset;
-            buf[i] = unchecked((byte)((buf[i] + (kB[localIndex % 16] >> 2)) % 256));
-            buf[i] ^= RotateLeft(kB[15 - (i - offset) % 16], (byte)((prevE + count - i - offset) % 7));
-            buf[i] = RotateRight(buf[i], (byte)((~(uint)(prevE)) % 7));
+            int bufIdx = offset + i;
+            buf[bufIdx] = unchecked((byte)((buf[bufIdx] + (kB[i % 16] >> 2)) % 256));
+            buf[bufIdx] ^= RotateLeft(kB[15 - i % 16], (byte)((prevE + length - i) % 7));
+            buf[bufIdx] = RotateRight(buf[bufIdx], (byte)((~(uint)(prevE)) % 7));
 
-            prevE = buf[i];
+            prevE = buf[bufIdx];
         }
     }
 
-    private void SimpleDecryptBytesSafe(byte[] buf, int offset, int count)
+    private void SimpleDecryptBytesSafe(byte[] buf, int offset, int length)
     {
         byte prevE = 0; // previous encrypted
-        for (int i = offset; i < count; i++)
+        for (int i = 0; i < length; i++)
         {
-            int localIndex = i - offset;
-            byte tmpE = buf[i];
-            buf[i] = RotateLeft(buf[i], (byte)((~(uint)(prevE)) % 7));
-            buf[i] ^= RotateLeft(kB[15 - (i - offset) % 16], (byte)((prevE + count - i - offset) % 7));
-            buf[i] = unchecked((byte)((buf[i] - (kB[localIndex % 16] >> 2) + 256) % 256));
+            int bufIdx = offset + i;
+            byte tmpE = buf[bufIdx];
+            buf[bufIdx] = RotateLeft(buf[bufIdx], (byte)((~(uint)(prevE)) % 7));
+            buf[bufIdx] ^= RotateLeft(kB[15 - i % 16], (byte)((prevE + length - i) % 7));
+            buf[bufIdx] = unchecked((byte)((buf[bufIdx] - (kB[i % 16] >> 2) + 256) % 256));
 
             prevE = tmpE;
         }
@@ -247,6 +247,10 @@ public class SafeEncryptionProvider
                     Console.WriteLine("Leftover is 0, no further byte pass required.");
                     Console.WriteLine("============================");
                 }
+                
+                // Copy processed words back to main buffer before returning
+                byte[] leftoverBufferProcessedWords = ConvertUIntArrayToByteArray(leftoverBufferWords);
+                Buffer.BlockCopy(leftoverBufferProcessedWords, 0, bufferArr, (int)(offset + fullWordCount * NMaxBytes), (int)n_leftover * 4);
                 return;
             }
         }
@@ -260,9 +264,9 @@ public class SafeEncryptionProvider
         }
 
         if (encrypt)
-            SimpleEncryptBytesSafe(bufferArr, (int)(count - leftover) + offset, count);
+            SimpleEncryptBytesSafe(bufferArr, (int)(count - leftover) + offset, (int)leftover);
         else
-            SimpleDecryptBytesSafe(bufferArr, (int)(count - leftover) + offset, count);
+            SimpleDecryptBytesSafe(bufferArr, (int)(count - leftover) + offset, (int)leftover);
 
         if (TraceAlgorithmTwo)
         {
