@@ -60,7 +60,8 @@ public class SafeEncryptionProvider
         byte prevE = 0; // previous encrypted
         for (int i = offset; i < count; i++)
         {
-            buf[i] = unchecked((byte)((buf[i] + (kB[i % 16] >> 2)) % 256));
+            int localIndex = i - offset;
+            buf[i] = unchecked((byte)((buf[i] + (kB[localIndex % 16] >> 2)) % 256));
             buf[i] ^= RotateLeft(kB[15 - (i - offset) % 16], (byte)((prevE + count - i - offset) % 7));
             buf[i] = RotateRight(buf[i], (byte)((~(uint)(prevE)) % 7));
 
@@ -73,10 +74,11 @@ public class SafeEncryptionProvider
         byte prevE = 0; // previous encrypted
         for (int i = offset; i < count; i++)
         {
+            int localIndex = i - offset;
             byte tmpE = buf[i];
             buf[i] = RotateLeft(buf[i], (byte)((~(uint)(prevE)) % 7));
             buf[i] ^= RotateLeft(kB[15 - (i - offset) % 16], (byte)((prevE + count - i - offset) % 7));
-            buf[i] = unchecked((byte)((buf[i] - (kB[i % 16] >> 2) + 256) % 256));
+            buf[i] = unchecked((byte)((buf[i] - (kB[localIndex % 16] >> 2) + 256) % 256));
 
             prevE = tmpE;
         }

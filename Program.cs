@@ -299,12 +299,58 @@ namespace fStreamDecryptor
 						for (int i = 0; i < fileHash_iv.Length; i++)
 							fileHash_iv[i] ^= fileHash_body[i % 16];
 					}
-					// fileInfo is the encrypted file listing; decrypt with XXTEA (SafeEncryptionProvider)
-					uint[] keyRawUInt = SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw);
-					SafeEncryptionProvider algorithmProvider = new SafeEncryptionProvider();
-					algorithmProvider.Init(keyRawUInt, fEnum.EncryptionMethod.Two);
-					algorithmProvider.Decrypt(fileInfo);
+					// fileInfo is the encrypted file listing
+					var methods = new[] { "XXTEA", "TEA", "AES" };
+					foreach (var method in methods)
+					{
+						Console.WriteLine($"[TEST] Decrypting fileInfo using {method}...");
+						byte[] fileInfoCopy = (byte[])fileInfo.Clone();
+						
+						if (method == "AES")
+						{
+							try {
+								using (Aes aes = Aes.Create())
+								{
+									aes.Key = keyRaw;
+									aes.IV = fileHash_iv;
+									aes.Mode = CipherMode.CBC;
+									aes.Padding = PaddingMode.PKCS7;
+									using (var decryptor = aes.CreateDecryptor())
+									{
+										fileInfoCopy = decryptor.TransformFinalBlock(fileInfoCopy, 0, fileInfoCopy.Length);
+									}
+								}
+							} catch (Exception ex) {
+								Console.WriteLine($"      AES failed: {ex.Message}");
+								continue;
+							}
+						}
+						else
+						{
+							fEnum.EncryptionMethod em = method == "XXTEA" ? fEnum.EncryptionMethod.Two : fEnum.EncryptionMethod.One;
+							SafeEncryptionProvider algorithmProvider = new SafeEncryptionProvider();
+							algorithmProvider.Init(SafeEncryptionProvider.ConvertByteArrayToUIntArray(keyRaw), em);
+							algorithmProvider.Decrypt(fileInfoCopy);
+						}
 
+						using (MemoryStream fileBuffer = new MemoryStream(fileInfoCopy))
+						using (BinaryReader reader = new BinaryReader(fileBuffer))
+						{
+							int count = reader.ReadInt32();
+							Console.WriteLine($"      Possible file count: {count}");
+							
+							if (count > 0 && count < 100) 
+							{
+								Console.WriteLine($"!!! SUCCESS !!! Valid file count found using {method}: {count}");
+								fileInfo = fileInfoCopy;
+								goto fileinfo_decrypted;
+							}
+						}
+					}
+					
+					throw new Exception("Could not decrypt fileInfo with a valid count.");
+
+					fileinfo_decrypted:
 					using (MemoryStream fileBuffer = new MemoryStream(fileInfo))
 					using (BinaryReader reader = new BinaryReader(fileBuffer))
 						{
