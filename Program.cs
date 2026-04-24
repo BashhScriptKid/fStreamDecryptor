@@ -219,6 +219,9 @@ namespace fStreamDecryptor
 				
 				static void doPostProcessing(BinaryReader br, string[] fileMeta, string? outputFormatPrompt, string filePath)
 				{
+					// Skip 64 bytes used for key verification in reference MapPackage.cs
+					// (the key was already verified earlier in the main flow)
+					br.BaseStream.Position += 64;
 					fOffsetFileinfo = (int)br.BaseStream.Position;
 
 					// Read length
