@@ -2,3 +2,5 @@
 .idea/*
 bin/*
 obj/*
+osu!stream/*
+/fStreamDecryptor.sln.DotSettings.user

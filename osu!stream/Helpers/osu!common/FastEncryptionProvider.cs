@@ -39,9 +39,7 @@ namespace osum.Helpers
 
             k = pkey;
             m = EM;
-#if SAFE_ENCRYPTION
             keyB = GeneralHelper.ConvertArray<uint, byte>(pkey);
-#endif
         }
 
 
