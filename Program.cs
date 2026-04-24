@@ -96,7 +96,10 @@ namespace fStreamDecryptor
 				Console.WriteLine("If it needs to, under specific reasons; note that file dragging won't work. Alternatively, right click on the file while holding SHIFT and click \"Copy as Path\".");
 			}
 
-			filePath = RequestPath();
+			if (args.Length > 0 && File.Exists(args[0]))
+				filePath = args[0];
+			else
+				filePath = RequestPath();
 
 			bool isOsz2 = CheckFileFormat(filePath)[1];
 
@@ -216,60 +219,6 @@ namespace fStreamDecryptor
 				
 				static void doPostProcessing(BinaryReader br, string[] fileMeta, string? outputFormatPrompt, string filePath)
 				{
-					int keyCheckOffset = (int)br.BaseStream.Position;
-
-					// Read and decrypt 64 bytes of known plaintext (matches original MapPackage.cs)
-					// This advances the stream position by 64 bytes
-					Console.WriteLine($"Before 64-byte read, position: {br.BaseStream.Position}");
-					
-					byte[] knownPlain = new byte[64];
-					new FastRandom(1990).NextBytes(knownPlain);
-					Console.WriteLine($"[DEBUG] FastRandom(1990) 64 bytes: {BitConverter.ToString(knownPlain)}");
-
-					try
-					{
-						var hasher = new Hasher();
-						string[] potentialSeeds = {
-							fileMeta[7] + "yhxyfjo5" + fileMeta[9], // Mapper + yhxyfjo5 + ID
-							fileMeta[7] + "yhxyfjo5",               // Mapper + yhxyfjo5 (Empty ID)
-							fileMeta[9] + "yhxyfjo5" + fileMeta[7], // ID + yhxyfjo5 + Mapper (Reversed)
-							(char)0x08 + fileMeta[0] + "4390gn8931i" + fileMeta[2], // Title + Artist (OSF2 style)
-						};
-
-						foreach (var seed in potentialSeeds)
-						{
-							Console.WriteLine($"[TEST] Trying seed: '{seed}'");
-							byte[] key = Hasher.CreateMD5(Encoding.ASCII.GetBytes(seed));
-							uint[] keyWords = SafeEncryptionProvider.ConvertByteArrayToUIntArray(key);
-							
-							br.BaseStream.Position = keyCheckOffset; // Reset for each attempt
-							
-							using (Stream cstream = new FastEncryptorStream(br.BaseStream, fEnum.EncryptionMethod.One, keyWords))
-							{
-								byte[] decryptedPlain = new byte[64];
-								cstream.Read(decryptedPlain, 0, 64);
-								
-								if (decryptedPlain.SequenceEqual(knownPlain))
-								{
-									Console.WriteLine("!!! SUCCESS !!! Key verification matched for seed: " + seed);
-									keyRaw = key; // Set global key
-									goto key_found;
-								}
-							}
-						}
-						
-						throw new Exception("Could not find a valid key seed.");
-						
-						key_found:
-						Console.WriteLine("Key verification successful.");
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"Error during key verification: {ex.Message}");
-						throw;
-					}
-
-					// Match the reference implementation: file-info starts after the 64-byte key check.
 					fOffsetFileinfo = (int)br.BaseStream.Position;
 
 					// Read length
@@ -357,9 +306,8 @@ namespace fStreamDecryptor
 									br.BaseStream.Position = fOffsetData + fi.Offset;
 									br.BaseStream.Read(buffer, 0, buffer.Length);
 
-									provider.Decrypt(buffer);
-
-									File.WriteAllBytes(Path.Combine(outPath, fi.Filename), buffer);
+									byte[] content = DecryptFileContent(buffer, provider);
+									File.WriteAllBytes(Path.Combine(outPath, fi.Filename), content);
 									Console.WriteLine("Done.");
 								}
 							}
@@ -386,8 +334,8 @@ namespace fStreamDecryptor
 											br.BaseStream.Position = fOffsetData + fi.Offset;
 											br.BaseStream.Read(buffer, 0, buffer.Length);
 
-											provider.Decrypt(buffer);
-											entryStream.Write(buffer, 0, buffer.Length);
+											byte[] content = DecryptFileContent(buffer, provider);
+											entryStream.Write(content, 0, content.Length);
 										}
 										Console.WriteLine("Done.");
 									}
@@ -408,6 +356,26 @@ namespace fStreamDecryptor
 							// ContinueOnPress(); filePath = RequestPath(); //repeat process
 							}
 
+
+		/// <summary>
+		/// Decrypts a single file's content from the package.
+		/// Matches the MapStream approach: first 4 bytes are the encrypted length prefix
+		/// (decrypted separately), the rest is the raw decrypted file content.
+		/// </summary>
+		private static byte[] DecryptFileContent(byte[] encryptedData, SafeEncryptionProvider provider)
+		{
+			if (encryptedData.Length < 4)
+				throw new ArgumentException("Encrypted data too short");
+
+			provider.Decrypt(encryptedData, 0, 4);
+			int originalLength = BinaryPrimitives.ReadInt32LittleEndian(encryptedData.AsSpan(0, 4));
+
+			provider.Decrypt(encryptedData, 4, encryptedData.Length - 4);
+
+			byte[] content = new byte[originalLength];
+			Buffer.BlockCopy(encryptedData, 4, content, 0, originalLength);
+			return content;
+		}
 
 		private static byte[] DecryptFile(Stream fileStream, fEnum.fDecryptMode mode)
 		{
